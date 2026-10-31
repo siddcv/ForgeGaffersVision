@@ -1,0 +1,11 @@
+data/clips/
+*.mp4
+*.mov
+cache/
+models/
+output/
+*.pt
+*.task
+__pycache__/
+.pytest_cache/
+.venv/
