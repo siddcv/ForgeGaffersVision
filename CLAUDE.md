@@ -32,6 +32,8 @@ python -m src.run_clip data/clips/clip.mp4 --stride 2   # 60 fps clip replayed a
 python -m src.run_clip data/clips/clip.mp4 --refresh    # re-run models after changing detection or crop settings
 ```
 
+Clips live in `data/clips/<session>/`, with one row per clip in `data/manifest.csv` and hand labels in `data/labels/<clip>.csv`; see `data/README.md`.
+
 `requirements.txt` pins every package and was generated on Windows with `pip freeze`. After adding a dependency, regenerate it and exclude pip and setuptools.
 
 ## Architecture

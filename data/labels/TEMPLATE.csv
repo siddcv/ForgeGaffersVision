@@ -1,0 +1,6 @@
+kind,t_s,end_s,foot,note
+touch,1.33,,left,
+touch,1.73,,right,
+lost_control,8.20,10.60,,ball rolled to right edge
+reset,10.60,,,
+head_down,12.00,14.50,,
