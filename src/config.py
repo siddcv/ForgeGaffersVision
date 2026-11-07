@@ -59,5 +59,5 @@ class Config:
             return self.ball_diameter_override_m
         return BALL_DIAMETER_M[self.ball_size]
  
-Claude finished the response
+
 
