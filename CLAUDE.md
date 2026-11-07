@@ -3,7 +3,7 @@
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## Status
-Early skeleton: build steps 1-6 have a first version, tested on synthetic data but not yet on a real tick-tock clip, so all thresholds are placeholders. Not built yet: Face Landmarker (head pitch uses a rough pose-only estimate) and `evaluate.py`. The full project brief (scope, build order, open items) is in `../CLAUDE.local.md`, which is not in this repo and may be absent on other machines.
+Early skeleton: build steps 1-6 have a first version, tested on synthetic data but not yet on a real tick-tock clip, so all thresholds are placeholders. Not built yet: Face Landmarker (head pitch uses a rough pose-only estimate). `evaluate.py` scores a report against hand labels. The full project brief (scope, build order, open items) is in `../CLAUDE.local.md`, which is not in this repo and may be absent on other machines.
 
 Gaffer's Vision is a computer-vision soccer training app. A phone camera watches one drill, the tick-tock, and reports touches by foot, ball speed in m/s, head-down time and lost-control moments. All current work is Python on a laptop, using recorded clips. Do not build a phone app yet; the mobile OS is undecided.
 
@@ -30,6 +30,9 @@ python -m pytest tests/test_metrics.py::test_head_down_just_under_one_second_is_
 python -m src.run_clip data/clips/clip.mp4
 python -m src.run_clip data/clips/clip.mp4 --stride 2   # 60 fps clip replayed at 30 fps, without re-running models
 python -m src.run_clip data/clips/clip.mp4 --refresh    # re-run models after changing detection or crop settings
+
+# Score a run against hand labels: writes output/<clip>_stride<N>/evaluation.json
+python -m src.evaluate output/<clip>_stride1/report.json
 ```
 
 Clips live in `data/clips/<session>/`, with one row per clip in `data/manifest.csv` and hand labels in `data/labels/<clip>.csv`; see `data/README.md`.
@@ -51,3 +54,4 @@ Per-frame pipeline: frame + real timestamp -> pose (MediaPipe Pose) -> ball dete
 - **Rules first:** no Random Forest, LSTM or ByteTrack until the rule-based baseline works and its failures are known.
 - **Licensing:** Ultralytics YOLOv8 is AGPL; compare Apache-licensed options before committing to a detector.
 - **Git:** keep clips and model weights out; pin dependency versions.
+
