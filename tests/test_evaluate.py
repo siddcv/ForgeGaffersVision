@@ -104,4 +104,4 @@ def test_drill_window_reads_manifest(tmp_path):
     assert drill_window(manifest, "missing") == (None, None)
     assert drill_window(tmp_path / "nope.csv", "abc") == (None, None)
  
-Claude finished the response
+
