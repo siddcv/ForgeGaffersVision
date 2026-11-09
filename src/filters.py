@@ -40,6 +40,12 @@ class Kalman1D:
         self.v = 0.0
         self.p = [[0.0, 0.0], [0.0, 0.0]]
 
+    def peek(self, t: float) -> float | None:
+        """Predicted position at time t, without changing the filter."""
+        if self.t is None:
+            return None
+        return self.x + self.v * max(0.0, t - self.t)
+
     def predict(self, t: float) -> float | None:
         if self.t is None:
             return None
