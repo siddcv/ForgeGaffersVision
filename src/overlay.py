@@ -66,6 +66,11 @@ def render(clip_path: str, out_path: str, records: list, landmarks, cfg) -> None
             if record["ball"] is not None:
                 x1, y1, x2, y2 = map(int, record["ball"][:4])
                 cv2.rectangle(image, (x1, y1), (x2, y2), (0, 165, 255), 2)
+            elif record.get("predicted"):
+                # Tracker prediction through a short detection gap.
+                center = tuple(map(int, record["ball_xy"]))
+                cv2.circle(image, center, 25, (0, 165, 255), 2)
+                cv2.putText(image, "pred", (center[0] + 30, center[1]), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 165, 255), 2)
             for event in record["events"]:
                 if event.kind == "touch":
                     left += event.foot == "left"

@@ -34,9 +34,22 @@ class Config:
     ball_search_after_s: float = 0.15
     ball_confidence: float = 0.15
     ball_class_id: int = 32  # COCO "sports ball"
+    ball_candidates: int = 3  # boxes kept per frame, so the tracker can pick the one that fits
     detector_weights: str = "yolov8n.pt"
-    crop_span_scale: float = 2.0
-    crop_min_frac: float = 0.25  # minimum crop side, as a fraction of frame height
+    crop_imgsz: int = 320  # detector input size for the foot crop
+    full_imgsz: int = 640  # detector input size for the full frame
+    # The untuned detector finds the ball best when it is about 40-80 px in the detector input,
+    # so the crop is sized from the last seen ball: diameter / crop_ball_frac.
+    crop_ball_frac: float = 0.18
+    crop_span_min_scale: float = 1.2  # the crop always covers the feet with this margin
+    crop_span_scale: float = 2.0  # used before the ball has been seen
+    crop_min_frac: float = 0.25  # minimum crop side before the ball has been seen, fraction of frame height
+    crop_pad_value: int = 114  # gray fill where the square crop extends past the frame edge
+
+    # Ball tracking on top of detection
+    track_gate_diam: float = 2.5  # accept a box only within this many ball diameters of the prediction
+    track_gate_max_s: float = 0.3  # after this long unseen, reacquire the ball nearest the feet
+    track_max_predict_s: float = 0.1  # bridge detection gaps up to this long; never while searching
 
     # Pose
     pose_min_visibility: float = 0.5

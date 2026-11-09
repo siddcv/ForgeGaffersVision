@@ -13,25 +13,33 @@ import numpy as np
 from . import ball as ball_module
 from . import metrics
 from .config import Config
-from .filters import Kalman1D, OneEuroFilter
+from .filters import OneEuroFilter
 from .pose import LEFT_FOOT, RIGHT_FOOT, PoseEstimator, coarse_head_pitch_deg, visible_points
 from .video_io import iter_frames, read_timestamps
 
 
-def _to_row(detection) -> list:
-    return list(detection) if detection is not None else [np.nan] * 5
+def _to_rows(detections, k: int) -> list:
+    """Fixed-size (k, 5) block of candidates, NaN-padded."""
+    rows = [list(d) for d in detections[:k]]
+    return rows + [[np.nan] * 5] * (k - len(rows))
 
 
-def _from_row(row):
-    return None if np.isnan(row[0]) else tuple(float(v) for v in row)
+def _from_rows(rows) -> list:
+    return [tuple(float(v) for v in row) for row in rows if not np.isnan(row[0])]
 
 
 def build_cache(clip_path: str, cache_path: Path, cfg: Config) -> None:
-    """Run the models once, saving crop and full-frame detections for every frame."""
+    """Run the models once, saving crop and full-frame candidates for every frame.
+
+    The crop is sized from the previous frame's ball (crop first, else full frame). Live, the
+    tracker's diameter plays that role; changing crop settings needs --refresh.
+    """
     pose = PoseEstimator()
     detector = ball_module.YoloBallDetector(cfg)
+    k = cfg.ball_candidates
     times, landmarks, crops, crop_balls, full_balls = [], [], [], [], []
     last_ms = -1
+    diameter = None
     try:
         for frame in iter_frames(clip_path):
             height, width = frame.bgr.shape[:2]
@@ -39,17 +47,22 @@ def build_cache(clip_path: str, cache_path: Path, cfg: Config) -> None:
             last_ms = t_ms
             points = pose.detect(cv2.cvtColor(frame.bgr, cv2.COLOR_BGR2RGB), t_ms)
             feet = visible_points(points, LEFT_FOOT + RIGHT_FOOT, cfg.pose_min_visibility)
-            crop = ball_module.foot_crop(feet, width, height, cfg)
-            crop_det = None
+            crop = ball_module.foot_crop(feet, width, height, cfg, diameter)
+            crop_dets = []
             if crop is not None:
-                x1, y1, x2, y2 = crop
-                found = detector.detect(frame.bgr[y1:y2, x1:x2])
-                crop_det = ball_module.to_full_frame(found, crop) if found else None
+                image = ball_module.crop_image(frame.bgr, crop, cfg.crop_pad_value)
+                crop_dets = [
+                    ball_module.to_full_frame(d, crop) for d in detector.detect(image, cfg.crop_imgsz)
+                ]
+            full_dets = detector.detect(frame.bgr, cfg.full_imgsz)
+            seen = crop_dets or full_dets
+            if seen:
+                diameter = ball_module.box_diameter_px(seen[0])
             times.append(frame.t_s)
             landmarks.append(points)
             crops.append(list(crop) if crop else [np.nan] * 4)
-            crop_balls.append(_to_row(crop_det))
-            full_balls.append(_to_row(detector.detect(frame.bgr)))
+            crop_balls.append(_to_rows(crop_dets, k))
+            full_balls.append(_to_rows(full_dets, k))
             if frame.index % 100 == 0:
                 print(f"  processed {frame.index} frames")
     finally:
@@ -64,9 +77,11 @@ def build_cache(clip_path: str, cache_path: Path, cfg: Config) -> None:
 def replay(cache, cfg: Config, stride: int = 1) -> list:
     """Feed cached model outputs through the same per-frame logic the phone will run."""
     search = ball_module.SearchState()
+    tracker = ball_module.BallTracker(cfg)
     state = metrics.initial_state()
-    make_kalman = lambda: Kalman1D(cfg.kalman_process_noise, cfg.kalman_measurement_noise)
-    kalman_x, kalman_y = make_kalman(), make_kalman()
+    crop_balls, full_balls = cache["crop_balls"], cache["full_balls"]
+    if crop_balls.ndim == 2:  # caches written before candidates were kept
+        crop_balls, full_balls = crop_balls[:, None, :], full_balls[:, None, :]
     euro = {}
     records = []
 
@@ -90,27 +105,31 @@ def replay(cache, cfg: Config, stride: int = 1) -> list:
         t_s = float(cache["t_s"][i])
         crop_row = cache["crops"][i]
         crop = None if np.isnan(crop_row[0]) else tuple(crop_row)
+        left_foot = smooth_points(LEFT_FOOT, cache["landmarks"][i], t_s)
+        right_foot = smooth_points(RIGHT_FOOT, cache["landmarks"][i], t_s)
+        feet = left_foot + right_foot
         search, detection, searched = ball_module.search_step(
-            search, t_s, crop, _from_row(cache["crop_balls"][i]), _from_row(cache["full_balls"][i]), cfg,
+            search, t_s, crop,
+            tracker.choose(t_s, _from_rows(crop_balls[i]), feet),
+            tracker.choose(t_s, _from_rows(full_balls[i]), feet),
+            cfg,
         )
-        ball_xy = diameter = None
-        if detection is not None:
-            x, y = ball_module.box_center(detection)
-            ball_xy = kalman_x.update(t_s, x), kalman_y.update(t_s, y)
-            diameter = ball_module.box_diameter_px(detection)
+        ball_xy, predicted = tracker.update(t_s, detection, searched)
         observation = metrics.Observation(
             t_s=t_s,
-            ball_xy=ball_xy,
-            ball_diameter_px=diameter,
+            # Metrics see detections only: on a real clip, snapping from a prediction back to the
+            # next detection looks like a direction change and adds false touches.
+            ball_xy=None if predicted else ball_xy,
+            ball_diameter_px=ball_module.box_diameter_px(detection) if detection else None,
             searched_full_frame=searched,
-            left_foot=smooth_points(LEFT_FOOT, cache["landmarks"][i], t_s),
-            right_foot=smooth_points(RIGHT_FOOT, cache["landmarks"][i], t_s),
+            left_foot=left_foot,
+            right_foot=right_foot,
             head_pitch_deg=coarse_head_pitch_deg(cache["landmarks"][i], cfg.pose_min_visibility),
         )
         state, events = metrics.step(state, observation, cfg)
         records.append({
-            "index": i, "t_s": t_s, "crop": crop, "ball": detection,
-            "searched_full_frame": searched, "events": events,
+            "index": i, "t_s": t_s, "crop": crop, "ball": detection, "ball_xy": ball_xy,
+            "predicted": predicted, "searched_full_frame": searched, "events": events,
         })
     return records
 
@@ -136,6 +155,7 @@ def summarize(records: list, cache, cfg: Config) -> dict:
         "timestamps_strictly_increasing": bool((gaps > 0).all()),
         "low_foot_visibility_pct": float(100 * np.mean(~(visibility >= cfg.pose_min_visibility))),
         "ball_found_pct": 100 * float(np.mean([r["ball"] is not None for r in records])),
+        "ball_tracked_pct": 100 * float(np.mean([r["ball_xy"] is not None for r in records])),
         "searching_pct": 100 * float(np.mean([r["searched_full_frame"] for r in records])),
         "touches": {
             "left": sum(e.foot == "left" for e in touches),
@@ -163,8 +183,11 @@ def save_foot_plot(records: list, cache, path: Path) -> None:
     figure, axis = plt.subplots(figsize=(12, 4))
     axis.plot(times, points[:, LEFT_FOOT[1], 0], label="left toe x")
     axis.plot(times, points[:, RIGHT_FOOT[1], 0], label="right toe x")
-    ball_x = [(r["ball"][0] + r["ball"][2]) / 2 if r["ball"] else np.nan for r in records]
-    axis.plot(times, ball_x, ".", markersize=3, label="ball x")
+    for predicted, label in ((False, "ball x (detected)"), (True, "ball x (predicted)")):
+        ball_x = [
+            r["ball_xy"][0] if r["ball_xy"] and r["predicted"] == predicted else np.nan for r in records
+        ]
+        axis.plot(times, ball_x, ".", markersize=3, label=label)
     axis.set(xlabel="time (s)", ylabel="x (pixels)")
     axis.legend()
     figure.tight_layout()
