@@ -3,7 +3,7 @@ from dataclasses import replace
 import pytest
 
 from src.config import Config
-from src.metrics import Observation, initial_state, step
+from src.metrics import Observation, foot_by_direction, initial_state, step
 from tests.synth import DIAMETER_PX, LEFT_FOOT, RIGHT_FOOT, Y, synth_tick_tock
 
 CFG = Config()
@@ -42,6 +42,33 @@ def test_repeat_touch_on_one_foot_is_not_forced_to_alternate():
     touches = kinds(run(observations + extra), "touch")
     assert touches[0].t_s == first_touch_s
     assert [touch.foot for touch in touches] == ["left", "left"]
+
+
+def test_foot_by_direction_picks_the_foot_ahead_of_the_ball():
+    feet_x = (200.0, 400.0)  # player's left foot on the image left
+    assert foot_by_direction(-1.0, feet_x) == "left"
+    assert foot_by_direction(+1.0, feet_x) == "right"
+    # Mirrored video or rear camera: the left foot is on the image right; the rule follows the feet.
+    assert foot_by_direction(+1.0, (400.0, 200.0)) == "left"
+    assert foot_by_direction(None, feet_x) is None
+    assert foot_by_direction(1.0, (300.0, 300.0)) is None
+    assert foot_by_direction(1.0, (None, 300.0)) is None
+
+
+@pytest.mark.parametrize("rule", ["direction", "nearest"])
+def test_ball_hidden_at_the_touch_keeps_the_right_foot(rule):
+    # As on the first real clip: the foot hides the ball at contact, and it is next detected
+    # about 130 ms later, already closer to the other foot.
+    observations = synth_tick_tock(4, 60.0)
+    first = kinds(run(observations), "touch")[0]
+    assert first.foot == "left"
+    index = next(i for i, o in enumerate(observations) if o.t_s > first.t_s)
+    hidden = [replace(o, ball_xy=None, ball_diameter_px=None) for o in observations[index:index + 8]]
+    shifted = [
+        replace(o, ball_xy=(o.ball_xy[0] + 110, Y)) for o in observations[index + 8:]
+    ]  # reappears nearer the right foot than the ball last was to the left foot
+    touches = kinds(run(observations[:index] + hidden + shifted, replace(CFG, touch_foot_rule=rule)), "touch")
+    assert touches[0].foot == "left"
 
 
 def test_reversal_far_from_feet_is_not_a_touch():

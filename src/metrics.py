@@ -34,6 +34,7 @@ class State:
     last_ball_xy: tuple | None = None
     last_vx_mps: float | None = None
     last_foot_distances: tuple | None = None
+    last_feet_x: tuple | None = None  # (left, right) mean foot x on the last ball frame
     last_touch_t_s: float | None = None
     speed_foot: str | None = None
     speed_start_t_s: float | None = None
@@ -74,6 +75,27 @@ def nearer_foot(distances: tuple) -> tuple:
     return "right", right
 
 
+def mean_x(points: tuple) -> float | None:
+    return sum(p[0] for p in points) / len(points) if points else None
+
+
+def foot_by_direction(incoming_vx: float | None, feet_x: tuple | None) -> str | None:
+    """The foot the ball was travelling toward before it reversed, or None if unclear.
+
+    In a tick-tock the ball crosses to a foot and comes back, so the foot ahead of it made the
+    touch. Unlike the nearest foot, this needs no ball detection at the moment of contact,
+    when the foot often hides the ball. Works for mirrored video too, since it compares the
+    feet's own image positions.
+    """
+    if incoming_vx is None or incoming_vx == 0 or feet_x is None:
+        return None
+    left_x, right_x = feet_x
+    if left_x is None or right_x is None or left_x == right_x:
+        return None
+    ahead_is_larger_x = incoming_vx > 0
+    return "left" if (left_x > right_x) == ahead_is_larger_x else "right"
+
+
 def is_reversal(previous_vx: float | None, vx: float, min_speed: float) -> bool:
     return (
         previous_vx is not None
@@ -104,6 +126,7 @@ def _step_ball(state: State, obs: Observation, distances: tuple, cfg) -> tuple:
         "last_ball_t_s": obs.t_s,
         "last_ball_xy": obs.ball_xy,
         "last_foot_distances": distances,
+        "last_feet_x": (mean_x(obs.left_foot), mean_x(obs.right_foot)),
     }
     dt = None if state.last_ball_t_s is None else obs.t_s - state.last_ball_t_s
     if dt is None or dt <= 0 or dt > cfg.touch_max_gap_s:
@@ -127,7 +150,13 @@ def _step_ball(state: State, obs: Observation, distances: tuple, cfg) -> tuple:
         limit = cfg.touch_foot_distance_diam * diameter
         if candidates and not recent and min(c[0] for c in candidates) <= limit:
             touched = True
-            foot = min(candidates, key=lambda c: c[0])[1]
+            foot = None
+            if cfg.touch_foot_rule == "direction":
+                foot = foot_by_direction(state.last_vx_mps, state.last_feet_x)
+            if foot is None:
+                # Nearest foot. The frame after can come well after contact when the ball was
+                # hidden, by which time it is heading for the other foot, so prefer the frame before.
+                foot = before or min(candidates, key=lambda c: c[0])[1]
             touch_t_s = state.last_ball_t_s
             pending = _speed_event(state, obs.t_s)
             if pending:

@@ -42,3 +42,22 @@ One CSV per labelled clip, `labels/<clip>.csv`, with times in seconds from the s
 | `head_down` | head goes down | head comes back up | blank |
 
 Label from the original video at full frame rate, stepping frame by frame around each touch.
+
+The easiest way is `python -m src.label_clip data/clips/<session>/<clip>.mp4`, which stamps each key
+press with the frame's timestamp and saves `labels/<clip>.csv` after every change:
+
+| Key | Label |
+|---|---|
+| `l` / `r` | touch with the player's left / right foot (the player's own foot, not the screen side) |
+| `x` / `y` | lost control starts / control regained (`y` also writes the `reset` row) |
+| `h` / `u` | head down starts / head back up |
+| `e` / `z` | erase the nearest label / undo |
+| space, `,` `.`, `j` `k`, `[` `]` | play-pause, one frame back-forward, one second back-forward, slower-faster |
+
+Label in three passes, one kind of event at a time, all saving into the same `labels/<clip>.csv`:
+`--focus touches` (keys `l` `r`, starts at 0.25x), `--focus lost` (`x` `y`, 0.5x) and `--focus head`
+(`h` `u`, 0.5x). A pass ignores the other passes' keys and only erases its own labels; their labels
+stay dimmed on the timeline. Run one pass at a time per clip, since each pass rewrites the file.
+
+For touches, pause and step to the contact frame before pressing, rather than pressing while it plays.
+On quit it prints the touch gaps and interval durations, a first hint for the thresholds in `config.py`.

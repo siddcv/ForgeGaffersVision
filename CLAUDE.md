@@ -31,6 +31,9 @@ python -m src.run_clip data/clips/clip.mp4
 python -m src.run_clip data/clips/clip.mp4 --stride 2   # 60 fps clip replayed at 30 fps, without re-running models
 python -m src.run_clip data/clips/clip.mp4 --refresh    # re-run models after changing detection or crop settings
 
+# Hand-label a clip by key press (touches, lost control, head down): writes data/labels/<clip>.csv
+python -m src.label_clip data/clips/<session>/<clip>.mp4
+
 # Score a run against hand labels: writes output/<clip>_stride<N>/evaluation.json
 python -m src.evaluate output/<clip>_stride1/report.json
 ```

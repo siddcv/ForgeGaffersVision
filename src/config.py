@@ -17,6 +17,9 @@ class Config:
     # Touches
     touch_min_speed_mps: float = 0.2
     touch_foot_distance_diam: float = 1.5  # allows for the ball being hidden at the touch
+    # Which foot made a touch: "direction" = the foot the ball was travelling toward (100% on the
+    # first labelled clip, vs 90% for "nearest"), "nearest" = the foot closest to the ball.
+    touch_foot_rule: str = "direction"
     touch_min_interval_s: float = 0.08
     touch_max_gap_s: float = 0.25
     speed_window_s: float = 0.10
