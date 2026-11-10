@@ -23,6 +23,12 @@ class Config:
     touch_min_interval_s: float = 0.08
     touch_max_gap_s: float = 0.25
     speed_window_s: float = 0.10
+
+    # Touches per minute
+    touches_per_minute_goal: int = 150  # the target players work up to
+    touch_minute_s: float = 60.0  # the window the goal is counted over
+    touch_pace_window_s: float = 10.0  # live pace: touches in this window, scaled to a minute
+    touch_pace_min_s: float = 3.0  # no pace until this long after the first touch
  
     # Lost control
     lost_distance_diam: float = 1.5

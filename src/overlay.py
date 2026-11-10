@@ -41,6 +41,21 @@ def _draw_skeleton(image, landmarks, min_visibility):
             )
 
 
+def touch_rate_text(rate, goal: int) -> str:
+    """'pace 138/min  last min 71  goal 150', or the first-minute form before a minute is up."""
+    if rate is None:
+        return f"goal {goal}/min"
+    pace = "pace --" if rate.pace_per_min is None else f"pace {rate.pace_per_min:.0f}/min"
+    minute = f"last min {rate.last_minute}" if rate.minute_complete else f"{rate.last_minute} so far"
+    return f"{pace}  {minute}  goal {goal}"
+
+
+def _draw_touch_rate(image, rate, goal: int) -> None:
+    met = rate is not None and rate.minute_complete and rate.last_minute >= goal
+    cv2.putText(image, touch_rate_text(rate, goal), (20, 120), cv2.FONT_HERSHEY_SIMPLEX, 1.0,
+                (0, 255, 0) if met else WHITE, 2)
+
+
 def render(clip_path: str, out_path: str, records: list, landmarks, cfg) -> None:
     by_index = {record["index"]: record for record in records}
     times = np.array([record["t_s"] for record in records])
@@ -82,6 +97,7 @@ def render(clip_path: str, out_path: str, records: list, landmarks, cfg) -> None
                 image, f"{mode}  L:{left} R:{right}  t={frame.t_s:.2f}s", (20, 40),
                 cv2.FONT_HERSHEY_SIMPLEX, 1.0, (255, 255, 255), 2,
             )
+            _draw_touch_rate(image, record.get("touch_rate"), cfg.touches_per_minute_goal)
             writer.write(image)
     finally:
         if writer is not None:

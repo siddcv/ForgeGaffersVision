@@ -5,7 +5,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Status
 Early skeleton: build steps 1-6 have a first version, tested on synthetic data but not yet on a real tick-tock clip, so all thresholds are placeholders. Not built yet: Face Landmarker (head pitch uses a rough pose-only estimate). `evaluate.py` scores a report against hand labels. The full project brief (scope, build order, open items) is in `../CLAUDE.local.md`, which is not in this repo and may be absent on other machines.
 
-Gaffer's Vision is a computer-vision soccer training app. A phone camera watches one drill, the tick-tock, and reports touches by foot, ball speed in m/s, head-down time and lost-control moments. All current work is Python on a laptop, using recorded clips. Do not build a phone app yet; the mobile OS is undecided.
+Gaffer's Vision is a computer-vision soccer training app. A phone camera watches one drill, the tick-tock, and reports touches by foot, touches per minute (players work toward 150 in a minute), ball speed in m/s, head-down time and lost-control moments. All current work is Python on a laptop, using recorded clips. Do not build a phone app yet; the mobile OS is undecided.
 
 ## The tick-tock drill
 The tick-tock is the only drill in scope; do not design for toe taps or other drills. The player stays roughly in place and knocks the ball side to side between the insides of their feet in a quick, steady rhythm, ideally with their head up. Each touch reverses the ball's horizontal direction, and touches usually alternate feet, though repeats on one foot must still be counted correctly. This is a working definition, pending client confirmation.

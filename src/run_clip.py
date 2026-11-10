@@ -130,8 +130,32 @@ def replay(cache, cfg: Config, stride: int = 1) -> list:
         records.append({
             "index": i, "t_s": t_s, "crop": crop, "ball": detection, "ball_xy": ball_xy,
             "predicted": predicted, "searched_full_frame": searched, "events": events,
+            "touch_rate": metrics.touch_rate(state, t_s, cfg),
         })
     return records
+
+
+def touches_per_minute_summary(records: list, touches: list, cfg: Config) -> dict:
+    """Average rate over the drill, best full minute, and the goal.
+
+    The drill is taken as first to last touch, since warm-up and walking to the phone
+    have no touches. best_minute stays None on a drill shorter than a minute.
+    """
+    times = sorted(e.t_s for e in touches)
+    span_s = times[-1] - times[0] if len(times) > 1 else 0.0
+    rates = [r["touch_rate"] for r in records if r.get("touch_rate")]
+    full = [r.last_minute for r in rates if r.minute_complete]
+    paces = [r.pace_per_min for r in rates if r.pace_per_min is not None]
+    best = max(full) if full else None
+    return {
+        "goal": cfg.touches_per_minute_goal,
+        "touches": len(times),
+        "drill_s": round(span_s, 2),
+        "average": round((len(times) - 1) / span_s * 60, 1) if span_s else None,
+        "best_minute": best,
+        "peak_pace": round(max(paces), 1) if paces else None,
+        "goal_met": None if best is None else best >= cfg.touches_per_minute_goal,
+    }
 
 
 def summarize(records: list, cache, cfg: Config) -> dict:
@@ -161,6 +185,7 @@ def summarize(records: list, cache, cfg: Config) -> dict:
             "left": sum(e.foot == "left" for e in touches),
             "right": sum(e.foot == "right" for e in touches),
         },
+        "touches_per_minute": touches_per_minute_summary(records, touches, cfg),
         "mean_speed_mps": {
             foot: float(np.mean(values)) if values else None for foot, values in speeds.items()
         },

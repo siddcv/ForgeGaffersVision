@@ -184,3 +184,69 @@ def test_step_does_not_mutate_previous_state():
     new_state, _ = step(state, synth_tick_tock(1)[0], CFG)
     assert state == initial_state()
     assert new_state != state
+
+
+# Touches per minute
+
+def touched_at(times, cfg=CFG):
+    from src.metrics import record_touch
+    state = initial_state()
+    for t in times:
+        state = record_touch(state, t, cfg)
+    return state
+
+
+def test_no_touches_gives_no_rate():
+    from src.metrics import touch_rate
+    rate = touch_rate(initial_state(), 5.0, CFG)
+    assert (rate.last_minute, rate.minute_complete, rate.pace_per_min) == (0, False, None)
+
+
+def test_steady_150_per_minute_meets_the_goal_after_a_full_minute():
+    from src.metrics import touch_rate
+    times = [i * 0.4 for i in range(200)]  # one touch every 0.4 s = 150 per minute
+    state = touched_at([t for t in times if t <= 70.0])
+    rate = touch_rate(state, 70.0, CFG)
+    assert rate.minute_complete and rate.last_minute == 150
+    assert rate.pace_per_min == pytest.approx(150, abs=6)
+
+
+def test_minute_is_not_complete_before_sixty_seconds():
+    from src.metrics import touch_rate
+    state = touched_at([i * 0.4 for i in range(100)])  # last touch at 39.6 s
+    rate = touch_rate(state, 40.0, CFG)
+    assert not rate.minute_complete and rate.last_minute == 100
+
+
+def test_pace_is_withheld_for_the_first_seconds_then_uses_the_time_so_far():
+    from src.metrics import touch_rate
+    state = touched_at([0.0, 0.5, 1.0, 1.5, 2.0])
+    assert touch_rate(state, 2.0, CFG).pace_per_min is None  # under touch_pace_min_s
+    state = touched_at([i * 0.5 for i in range(9)])  # 0 .. 4 s, 120 per minute
+    assert touch_rate(state, 4.0, CFG).pace_per_min == pytest.approx(9 / 4 * 60)
+
+
+def test_pace_falls_when_the_player_stops():
+    from src.metrics import touch_rate
+    state = touched_at([i * 0.4 for i in range(50)])  # stops at 19.6 s
+    assert touch_rate(state, 19.6, CFG).pace_per_min == pytest.approx(150, abs=6)
+    assert touch_rate(state, 25.0, CFG).pace_per_min < 80
+    assert touch_rate(state, 30.0, CFG).pace_per_min == 0
+
+
+def test_old_touches_drop_out_of_the_window():
+    state = touched_at([i * 0.4 for i in range(400)])  # 160 s of touches
+    assert len(state.recent_touch_t_s) == 150  # only the last minute is kept
+
+
+def test_step_counts_touches_into_the_rate():
+    from src.metrics import touch_rate
+    observations = synth_tick_tock(40, 60.0)
+    state = initial_state()
+    touches = 0
+    for o in observations:
+        state, events = step(state, o, CFG)
+        touches += len(kinds(events, "touch"))
+    rate = touch_rate(state, observations[-1].t_s, CFG)
+    assert rate.last_minute == touches == len(state.recent_touch_t_s)
+    assert rate.pace_per_min is not None

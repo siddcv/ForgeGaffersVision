@@ -36,6 +36,8 @@ class State:
     last_foot_distances: tuple | None = None
     last_feet_x: tuple | None = None  # (left, right) mean foot x on the last ball frame
     last_touch_t_s: float | None = None
+    first_touch_t_s: float | None = None
+    recent_touch_t_s: tuple = ()  # touch times within the last touch_minute_s, oldest first
     speed_foot: str | None = None
     speed_start_t_s: float | None = None
     speed_end_t_s: float | None = None
@@ -47,8 +49,40 @@ class State:
     head_down_since_s: float | None = None
 
 
+@dataclass(frozen=True)
+class TouchRate:
+    last_minute: int  # touches in the last touch_minute_s, the number the goal is set on
+    minute_complete: bool  # a full minute has passed since the first touch
+    pace_per_min: float | None  # touches in the last touch_pace_window_s, scaled to a minute
+
+
 def initial_state() -> State:
     return State()
+
+
+def record_touch(state: State, t_s: float, cfg) -> State:
+    """Add a touch to the rolling window, dropping touches older than a minute."""
+    recent = tuple(t for t in state.recent_touch_t_s if t_s - t < cfg.touch_minute_s) + (t_s,)
+    first = state.first_touch_t_s if state.first_touch_t_s is not None else t_s
+    return replace(state, recent_touch_t_s=recent, first_touch_t_s=first)
+
+
+def touch_rate(state: State, t_s: float, cfg) -> TouchRate:
+    """Touches per minute as of t_s, for a live readout. Call on any frame.
+
+    The pace uses a shorter window so it responds within seconds and falls when the player
+    stops. Before touch_pace_window_s has passed since the first touch it uses the time so far,
+    and it stays None until touch_pace_min_s, when a couple of touches would give a wild number.
+    """
+    if state.first_touch_t_s is None:
+        return TouchRate(0, False, None)
+    elapsed = t_s - state.first_touch_t_s
+    last_minute = sum(0 <= t_s - t < cfg.touch_minute_s for t in state.recent_touch_t_s)
+    window = min(cfg.touch_pace_window_s, elapsed)
+    pace = None
+    if window >= cfg.touch_pace_min_s:
+        pace = sum(0 <= t_s - t <= window for t in state.recent_touch_t_s) / window * 60
+    return TouchRate(last_minute, elapsed >= cfg.touch_minute_s, pace)
 
 
 def smooth_diameter(previous: float | None, measured: float | None, weight: float) -> float | None:
@@ -162,7 +196,10 @@ def _step_ball(state: State, obs: Observation, distances: tuple, cfg) -> tuple:
             if pending:
                 events.append(pending)
             events.append(Event("touch", touch_t_s, obs.t_s, foot=foot))
+            counted = record_touch(state, touch_t_s, cfg)
             updates.update(
+                recent_touch_t_s=counted.recent_touch_t_s,
+                first_touch_t_s=counted.first_touch_t_s,
                 last_touch_t_s=touch_t_s,
                 speed_foot=foot,
                 # Start after the turnaround frame, whose motion partly cancels out.
