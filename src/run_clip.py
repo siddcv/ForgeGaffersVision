@@ -181,9 +181,14 @@ def summarize(records: list, cache, cfg: Config) -> dict:
         "ball_found_pct": 100 * float(np.mean([r["ball"] is not None for r in records])),
         "ball_tracked_pct": 100 * float(np.mean([r["ball_xy"] is not None for r in records])),
         "searching_pct": 100 * float(np.mean([r["searched_full_frame"] for r in records])),
+        # Tick-tocks: contacts that sent the ball across to the other foot.
         "touches": {
             "left": sum(e.foot == "left" for e in touches),
             "right": sum(e.foot == "right" for e in touches),
+        },
+        # Every touch on the ball, including setup and recovery taps and same-foot repeats.
+        "contacts": {
+            foot: sum(e.kind == "contact" and e.foot == foot for e in events) for foot in ("left", "right")
         },
         "touches_per_minute": touches_per_minute_summary(records, touches, cfg),
         "mean_speed_mps": {

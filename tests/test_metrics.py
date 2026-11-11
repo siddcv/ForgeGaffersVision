@@ -23,14 +23,25 @@ def kinds(events, kind):
 
 
 @pytest.mark.parametrize("fps", [30.0, 60.0])
-def test_counts_alternating_touches(fps):
-    touches = kinds(run(synth_tick_tock(8, fps)), "touch")
-    assert [t.foot for t in touches] == ["left", "right"] * 4
+def test_counts_alternating_contacts(fps):
+    contacts = kinds(run(synth_tick_tock(8, fps)), "contact")
+    assert [c.foot for c in contacts] == ["left", "right"] * 4
 
 
-def test_repeat_touch_on_one_foot_is_not_forced_to_alternate():
+@pytest.mark.parametrize("fps", [30.0, 60.0])
+def test_alternating_contacts_are_tick_tocks_except_the_last(fps):
+    events = run(synth_tick_tock(8, fps))
+    contacts, touches = kinds(events, "contact"), kinds(events, "touch")
+    # The last contact has no answer from the other foot yet, so it is not a tick-tock.
+    assert [t.foot for t in touches] == (["left", "right"] * 4)[:7]
+    for touch, contact, answer in zip(touches, contacts, contacts[1:]):
+        assert touch.t_s == contact.t_s  # stamped at the first foot's contact
+        assert touch.reported_t_s == answer.reported_t_s  # reported when the other foot answers
+
+
+def test_repeat_contact_on_one_foot_is_not_forced_to_alternate():
     observations = synth_tick_tock(1, 30.0)
-    first_touch_s = kinds(run(observations), "touch")[0].t_s
+    first_touch_s = kinds(run(observations), "contact")[0].t_s
     # Ball comes back to the left foot and is sent away again, with no right touch.
     t = observations[-1].t_s
     x = observations[-1].ball_xy[0]
@@ -39,9 +50,11 @@ def test_repeat_touch_on_one_foot_is_not_forced_to_alternate():
         t += 1 / 30
         x += direction * 9
         extra.append(replace(observations[-1], t_s=t, ball_xy=(x, Y)))
-    touches = kinds(run(observations + extra), "touch")
-    assert touches[0].t_s == first_touch_s
-    assert [touch.foot for touch in touches] == ["left", "left"]
+    events = run(observations + extra)
+    contacts = kinds(events, "contact")
+    assert contacts[0].t_s == first_touch_s
+    assert [c.foot for c in contacts] == ["left", "left"]
+    assert kinds(events, "touch") == []  # a same-foot repeat is never a tick-tock
 
 
 def test_foot_by_direction_picks_the_foot_ahead_of_the_ball():
@@ -60,15 +73,15 @@ def test_ball_hidden_at_the_touch_keeps_the_right_foot(rule):
     # As on the first real clip: the foot hides the ball at contact, and it is next detected
     # about 130 ms later, already closer to the other foot.
     observations = synth_tick_tock(4, 60.0)
-    first = kinds(run(observations), "touch")[0]
+    first = kinds(run(observations), "contact")[0]
     assert first.foot == "left"
     index = next(i for i, o in enumerate(observations) if o.t_s > first.t_s)
     hidden = [replace(o, ball_xy=None, ball_diameter_px=None) for o in observations[index:index + 8]]
     shifted = [
         replace(o, ball_xy=(o.ball_xy[0] + 110, Y)) for o in observations[index + 8:]
     ]  # reappears nearer the right foot than the ball last was to the left foot
-    touches = kinds(run(observations[:index] + hidden + shifted, replace(CFG, touch_foot_rule=rule)), "touch")
-    assert touches[0].foot == "left"
+    contacts = kinds(run(observations[:index] + hidden + shifted, replace(CFG, touch_foot_rule=rule)), "contact")
+    assert contacts[0].foot == "left"
 
 
 def test_reversal_far_from_feet_is_not_a_touch():
@@ -76,7 +89,8 @@ def test_reversal_far_from_feet_is_not_a_touch():
         replace(o, left_foot=((-5000.0, Y),), right_foot=((5000.0, Y),))
         for o in synth_tick_tock(4)
     ]
-    assert kinds(run(observations), "touch") == []
+    events = run(observations)
+    assert kinds(events, "contact") == [] and kinds(events, "touch") == []
 
 
 def test_still_ball_has_no_touches():
@@ -87,18 +101,132 @@ def test_still_ball_has_no_touches():
         )
         for i in range(60)
     ]
-    assert kinds(run(observations), "touch") == []
+    assert kinds(run(observations), "contact") == []
 
 
 def test_touch_survives_a_brief_occlusion_at_the_foot():
     observations = synth_tick_tock(4)
-    first = kinds(run(observations), "touch")[0]
+    first = kinds(run(observations), "contact")[0]
     index = next(i for i, o in enumerate(observations) if o.t_s >= first.t_s)
     hidden = [
         replace(o, ball_xy=None, ball_diameter_px=None) if abs(i - index) <= 1 else o
         for i, o in enumerate(observations)
     ]
-    assert len(kinds(run(hidden), "touch")) == 4
+    events = run(hidden)
+    assert len(kinds(events, "contact")) == 4
+    assert len(kinds(events, "touch")) == 3
+
+
+# Tick-tocks: the ball must cross the midpoint and the other foot must make the next contact.
+# Feet at x 200 (left) and 400 (right), midpoint 300; the ball turns at 240 / 360 in a normal touch.
+
+def path(waypoints, fps=60.0, speed_px_s=300.0, start_t=0.0, feet=(LEFT_FOOT, RIGHT_FOOT)):
+    """Ball moving at constant speed through the given x positions, turning at each one."""
+    observations, t = [], start_t
+    x = waypoints[0]
+    for target in waypoints[1:]:
+        while abs(target - x) > 1e-9:
+            t += 1 / fps
+            step_px = min(speed_px_s / fps, abs(target - x))
+            x += step_px if target > x else -step_px
+            observations.append(Observation(
+                t_s=t, ball_xy=(x, Y), ball_diameter_px=DIAMETER_PX,
+                left_foot=feet[0], right_foot=feet[1],
+            ))
+    return observations
+
+
+def contacts_and_touches(observations, cfg=CFG):
+    events = run(observations, cfg)
+    return [c.foot for c in kinds(events, "contact")], [t.foot for t in kinds(events, "touch")]
+
+
+def test_crossed_midpoint_follows_the_feet():
+    from src.metrics import crossed_midpoint
+    assert crossed_midpoint(320.0, LEFT_FOOT, RIGHT_FOOT, "left")
+    assert not crossed_midpoint(280.0, LEFT_FOOT, RIGHT_FOOT, "left")
+    assert crossed_midpoint(280.0, LEFT_FOOT, RIGHT_FOOT, "right")
+    # Mirrored: the left foot on the image right; the midpoint test follows the feet.
+    assert crossed_midpoint(280.0, RIGHT_FOOT, LEFT_FOOT, "left")
+    # The midpoint moves with the feet: shift both feet right by 100, midpoint 400.
+    shifted_left = tuple((x + 100, y) for x, y in LEFT_FOOT)
+    shifted_right = tuple((x + 100, y) for x, y in RIGHT_FOOT)
+    assert not crossed_midpoint(320.0, shifted_left, shifted_right, "left")
+    assert not crossed_midpoint(320.0, (), RIGHT_FOOT, "left")  # a foot not visible
+
+
+def test_clean_run_counts_every_answered_touch():
+    contacts, touches = contacts_and_touches(path([300, 240, 360, 240, 360, 300]))
+    assert contacts == ["left", "right", "left", "right"]
+    assert touches == ["left", "right", "left"]  # the last right has no answer from the left
+
+
+def test_same_foot_twice_counts_only_the_touch_that_crosses():
+    # Left touch, ball drifts back to the left foot without crossing, left again, then a normal run.
+    contacts, touches = contacts_and_touches(path([300, 240, 290, 240, 360, 240, 300]))
+    assert contacts == ["left", "left", "right", "left"]
+    assert touches == ["left", "right"]  # the first left is a contact only
+
+
+def test_nudge_that_does_not_cross_is_not_a_tick_tock():
+    # A setup tap: the left foot nudges the ball part way (to 275, short of the midpoint at 300),
+    # it rolls back, and the left foot plays it properly into a normal run.
+    events = run(path([300, 240, 275, 235, 360, 240, 300]))
+    contacts = kinds(events, "contact")
+    assert [c.foot for c in contacts] == ["left", "left", "right", "left"]
+    assert contacts[0].t_s not in [t.t_s for t in kinds(events, "touch")]  # the nudge never crossed
+    assert [t.foot for t in kinds(events, "touch")] == ["left", "right"]
+
+
+def test_jitter_on_a_creeping_ball_is_not_a_contact():
+    # As at the start of 134129: the ball creeps toward the right foot at ~0.2 m/s and detection
+    # jitter of a few pixels flips its direction, next to the foot.
+    observations = path([300, 352, 355, 352, 355, 351], speed_px_s=45.0)  # 3 px = 0.075 ball widths
+    assert kinds(run(observations), "contact") == []
+    # The same turns with real travel (a ball-width each way) are contacts.
+    assert len(kinds(run(path([300, 360, 320, 362, 300])), "contact")) == 2
+
+
+def test_slow_answer_inside_the_arrival_limit_still_confirms_the_tick_tock():
+    # As at 8.3-8.8 s on 134129: the right foot answers within the limit, but the ball leaves it so
+    # slowly that the answer is only confirmed (half a ball-width later) after the limit has passed.
+    cfg = replace(CFG, ticktock_max_arrival_s=0.5)
+    fast = path([300, 240, 360])  # left turn at 0.2 s, right turn at 0.6 s: inside the limit
+    slow = path([360, 330], speed_px_s=40.0, start_t=fast[-1].t_s)  # 20 px of travel takes 0.5 s
+    contacts, touches = contacts_and_touches(fast + slow, cfg)
+    assert contacts == ["left", "right"]
+    assert touches == ["left"]
+
+
+def test_contact_is_reported_once_the_ball_has_travelled_after_the_turn():
+    events = run(path([300, 240, 360]))
+    contact = kinds(events, "contact")[0]
+    travel_s = CFG.touch_min_travel_diam * DIAMETER_PX / 300.0
+    assert contact.reported_t_s - contact.t_s == pytest.approx(travel_s, abs=2 / 60)
+
+
+def test_ball_that_crosses_but_never_reaches_the_other_foot_is_not_a_tick_tock():
+    # Left touch sends the ball across and away: no contact by the right foot.
+    contacts, touches = contacts_and_touches(path([300, 240, 1000]))
+    assert contacts == ["left"] and touches == []
+
+
+def test_answer_after_the_arrival_limit_is_not_a_tick_tock():
+    slow = path([300, 240, 330])
+    gap_s = CFG.ticktock_max_arrival_s + 0.3
+    # Ball sits unseen past the midpoint, then reaches the right foot and is sent back.
+    rest = path([330, 360, 240, 300], start_t=slow[-1].t_s + gap_s)
+    contacts, touches = contacts_and_touches(slow + rest)
+    assert contacts == ["left", "right", "left"]
+    assert touches == ["right"]  # the first left timed out; right was answered by the left
+
+
+def test_lost_control_cancels_the_pending_touch():
+    cfg = replace(CFG, ticktock_max_arrival_s=10.0)  # so only lost control can cancel it
+    observations = path([300, 240, 330]) + missing(40, searched=True, start=0.6) + path([330, 360, 240, 300], start_t=2.0)
+    events = run(observations, cfg)
+    assert len(kinds(events, "lost_control")) == 1
+    assert [t.foot for t in kinds(events, "touch")] == ["right"]
 
 
 @pytest.mark.parametrize("fps", [30.0, 60.0])

@@ -15,12 +15,25 @@ class Config:
     diameter_smoothing: float = 0.2  # weight of the newest measurement
  
     # Touches
+    # Ball speed needed before and after a reversal. Tried 0.3-0.5 on 134129: it removed a false
+    # contact from a creeping ball (0.95 s) but missed the first real touch, which starts from that
+    # slow ball, and let a stale remembered direction turn a stop-and-carry into a contact (9.65 s).
     touch_min_speed_mps: float = 0.2
+    # A direction change counts only if the ball travelled this many ball diameters into the turn
+    # and away from it, so detection jitter on a slowly creeping ball is not a contact (134129, 0.95 s).
+    # Contacts are therefore reported once the ball has moved this far after the turn.
+    # Kept small: at contact the foot covers the ball and its box centre wobbles, and each wobble
+    # restarts the count. On 134129 + park (126 labelled): 0 -> 121 hits / 5 false, 0.05 -> 120 / 3,
+    # 0.1 -> 117 / 2, 0.5 -> 112 / 1.
+    touch_min_travel_diam: float = 0.1
     touch_foot_distance_diam: float = 1.5  # allows for the ball being hidden at the touch
     # Which foot made a touch: "direction" = the foot the ball was travelling toward (100% on the
     # first labelled clip, vs 90% for "nearest"), "nearest" = the foot closest to the ball.
     touch_foot_rule: str = "direction"
     touch_min_interval_s: float = 0.08
+    # A contact counts as a tick-tock only if the ball crosses the midpoint between the feet and
+    # the other foot makes the next contact within this time. Labelled touch gaps were 0.30-0.6 s.
+    ticktock_max_arrival_s: float = 1.0
     touch_max_gap_s: float = 0.25
     speed_window_s: float = 0.10
 
@@ -62,7 +75,10 @@ class Config:
     track_max_predict_s: float = 0.1  # bridge detection gaps up to this long; never while searching
 
     # Evaluation (evaluate.py): how far apart in time a detection and a label can be and still match
-    eval_touch_tolerance_s: float = 0.10
+    # Labels mark push-off, once the ball is clearly sent back; the pipeline marks first contact,
+    # 0.13-0.15 s earlier on real clips. Real touches are >= 0.30 s apart, so 0.2 s cannot pair
+    # a detection with a neighbouring touch.
+    eval_touch_tolerance_s: float = 0.20
     eval_event_tolerance_s: float = 0.50  # lost control, reset, head down
     # Pose
     pose_min_visibility: float = 0.5

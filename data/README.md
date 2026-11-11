@@ -36,7 +36,7 @@ One CSV per labelled clip, `labels/<clip>.csv`, with times in seconds from the s
 
 | `kind` | `t_s` | `end_s` | `foot` |
 |---|---|---|---|
-| `touch` | moment of contact | blank | `left` / `right` (the player's foot) |
+| `touch` | push-off: when the ball is clearly sent back (tick-tocks only) | blank | `left` / `right` (the player's foot) |
 | `lost_control` | ball escapes | ball back under control | blank |
 | `reset` | play restarts | blank | blank |
 | `head_down` | head goes down | head comes back up | blank |

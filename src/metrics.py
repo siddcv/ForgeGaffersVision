@@ -2,6 +2,14 @@
 
 Call step(state, observation, cfg) once per frame. cfg is any object with the
 threshold fields of config.Config, passed in so this module imports nothing else.
+
+Two touch counts:
+  contact  any touch on the ball: a direction change next to a foot. Setup taps, recovery
+           taps and repeats on one foot all count. Reported straight away.
+  touch    a tick-tock: a contact by one foot that sends the ball across the midpoint between
+           the feet and whose next contact is by the other foot, within ticktock_max_arrival_s.
+           Stamped at the first foot's contact, reported when the other foot touches the ball,
+           so it lags about one touch gap. Touches per minute counts these.
 """
 import math
 from dataclasses import dataclass, replace
@@ -20,7 +28,7 @@ class Observation:
 
 @dataclass(frozen=True)
 class Event:
-    kind: str  # touch, speed, lost_control, reset, head_down, head_up
+    kind: str  # contact, touch (tick-tock), speed, lost_control, reset, head_down, head_up
     t_s: float  # when it happened
     reported_t_s: float  # when the system knew; the difference is detection latency
     foot: str | None = None
@@ -35,7 +43,18 @@ class State:
     last_vx_mps: float | None = None
     last_foot_distances: tuple | None = None
     last_feet_x: tuple | None = None  # (left, right) mean foot x on the last ball frame
-    last_touch_t_s: float | None = None
+    last_touch_t_s: float | None = None  # last contact, for touch_min_interval_s
+    # The latest contact, waiting to be confirmed as a tick-tock by the other foot.
+    pending_foot: str | None = None
+    pending_t_s: float | None = None
+    pending_crossed: bool = False  # the ball has since crossed the midpoint toward the other foot
+    # Minimum travel: where the current run of motion started, and a turn near a foot that becomes a
+    # contact once the ball has moved touch_min_travel_diam away from it in the new direction.
+    run_start_x: float | None = None
+    turn_t_s: float | None = None
+    turn_x: float | None = None
+    turn_foot: str | None = None
+    turn_direction: int = 0  # +1 / -1, the new direction of travel in image x
     first_touch_t_s: float | None = None
     recent_touch_t_s: tuple = ()  # touch times within the last touch_minute_s, oldest first
     speed_foot: str | None = None
@@ -130,6 +149,21 @@ def foot_by_direction(incoming_vx: float | None, feet_x: tuple | None) -> str | 
     return "left" if (left_x > right_x) == ahead_is_larger_x else "right"
 
 
+def crossed_midpoint(ball_x: float, left_foot: tuple, right_foot: tuple, from_foot: str) -> bool:
+    """Whether the ball is past the midpoint between the feet, on the side away from from_foot.
+
+    The midpoint is halfway between the two feet, each foot being the mean x of its heel and
+    toe on this frame, so it moves with the player. Compares the feet's own image positions,
+    so it works for mirrored video too. False when either foot is not visible.
+    """
+    left_x, right_x = mean_x(left_foot), mean_x(right_foot)
+    if left_x is None or right_x is None or left_x == right_x:
+        return False
+    midpoint = (left_x + right_x) / 2
+    target_x = right_x if from_foot == "left" else left_x
+    return (ball_x - midpoint) * (target_x - midpoint) > 0
+
+
 def is_reversal(previous_vx: float | None, vx: float, min_speed: float) -> bool:
     return (
         previous_vx is not None
@@ -162,18 +196,30 @@ def _step_ball(state: State, obs: Observation, distances: tuple, cfg) -> tuple:
         "last_foot_distances": distances,
         "last_feet_x": (mean_x(obs.left_foot), mean_x(obs.right_foot)),
     }
+    if (state.pending_foot is not None and not state.pending_crossed
+            and crossed_midpoint(obs.ball_xy[0], obs.left_foot, obs.right_foot, state.pending_foot)):
+        updates["pending_crossed"] = True
+        state = replace(state, pending_crossed=True)
+    no_turn = {"turn_t_s": None, "turn_x": None, "turn_foot": None, "turn_direction": 0}
     dt = None if state.last_ball_t_s is None else obs.t_s - state.last_ball_t_s
     if dt is None or dt <= 0 or dt > cfg.touch_max_gap_s:
-        return replace(state, last_vx_mps=None, **updates), events
+        # New track: no direction yet, and the run of motion starts here.
+        return replace(state, last_vx_mps=None, run_start_x=obs.ball_xy[0], **no_turn, **updates), events
 
     vx = (obs.ball_xy[0] - state.last_ball_xy[0]) * meters_per_px / dt
     # Keep the last clear direction: across an occluded touch, net motion is near zero.
     if abs(vx) >= cfg.touch_min_speed_mps:
         updates["last_vx_mps"] = vx
     moved_m =math.dist(obs.ball_xy, state.last_ball_xy) * meters_per_px
+    min_travel_px = cfg.touch_min_travel_diam * diameter
+    run_start_x = state.run_start_x if state.run_start_x is not None else state.last_ball_xy[0]
 
-    touched = False
     if is_reversal(state.last_vx_mps, vx, cfg.touch_min_speed_mps):
+        turn_x = state.last_ball_xy[0]
+        travelled_in = abs(turn_x - run_start_x)
+        # A new run starts at the turn. Any earlier turn that has not yet travelled far enough was
+        # jitter, so it is dropped.
+        updates.update(run_start_x=turn_x, **no_turn)
         recent = state.last_touch_t_s is not None and (
             state.last_ball_t_s - state.last_touch_t_s < cfg.touch_min_interval_s
         )
@@ -182,8 +228,8 @@ def _step_ball(state: State, obs: Observation, distances: tuple, cfg) -> tuple:
         after, after_distance = nearer_foot(distances)
         candidates = [c for c in ((before_distance, before), (after_distance, after)) if c[1]]
         limit = cfg.touch_foot_distance_diam * diameter
-        if candidates and not recent and min(c[0] for c in candidates) <= limit:
-            touched = True
+        if (candidates and not recent and min(c[0] for c in candidates) <= limit
+                and travelled_in >= min_travel_px):
             foot = None
             if cfg.touch_foot_rule == "direction":
                 foot = foot_by_direction(state.last_vx_mps, state.last_feet_x)
@@ -191,15 +237,40 @@ def _step_ball(state: State, obs: Observation, distances: tuple, cfg) -> tuple:
                 # Nearest foot. The frame after can come well after contact when the ball was
                 # hidden, by which time it is heading for the other foot, so prefer the frame before.
                 foot = before or min(candidates, key=lambda c: c[0])[1]
-            touch_t_s = state.last_ball_t_s
+            updates.update(
+                turn_t_s=state.last_ball_t_s, turn_x=turn_x, turn_foot=foot,
+                turn_direction=1 if vx > 0 else -1,
+            )
+
+    # A turn becomes a contact once the ball has travelled far enough in the new direction, so a
+    # few pixels of detection jitter on a slow ball never count.
+    turn_t_s = updates.get("turn_t_s", state.turn_t_s)
+    touched = False
+    if turn_t_s is not None:
+        turn_x = updates.get("turn_x", state.turn_x)
+        direction = updates.get("turn_direction", state.turn_direction)
+        if (obs.ball_xy[0] - turn_x) * direction >= min_travel_px:
+            touched = True
+            foot = updates.get("turn_foot", state.turn_foot)
+            touch_t_s = turn_t_s
+            updates.update(no_turn)
             pending = _speed_event(state, obs.t_s)
             if pending:
                 events.append(pending)
-            events.append(Event("touch", touch_t_s, obs.t_s, foot=foot))
-            counted = record_touch(state, touch_t_s, cfg)
+            events.append(Event("contact", touch_t_s, obs.t_s, foot=foot))
+            # The pending contact is a tick-tock if the ball crossed over and this foot is the other one.
+            if (state.pending_foot is not None and foot != state.pending_foot and state.pending_crossed
+                    and touch_t_s - state.pending_t_s <= cfg.ticktock_max_arrival_s):
+                events.append(Event("touch", state.pending_t_s, obs.t_s, foot=state.pending_foot))
+                counted = record_touch(state, state.pending_t_s, cfg)
+                updates.update(
+                    recent_touch_t_s=counted.recent_touch_t_s,
+                    first_touch_t_s=counted.first_touch_t_s,
+                )
             updates.update(
-                recent_touch_t_s=counted.recent_touch_t_s,
-                first_touch_t_s=counted.first_touch_t_s,
+                pending_foot=foot,
+                pending_t_s=touch_t_s,
+                pending_crossed=False,
                 last_touch_t_s=touch_t_s,
                 speed_foot=foot,
                 # Start after the turnaround frame, whose motion partly cancels out.
@@ -270,6 +341,18 @@ def _step_head(state: State, obs: Observation, cfg) -> tuple:
     return state, []
 
 
+def _expire_pending(state: State, t_s: float, cfg) -> State:
+    """Drop the pending contact once the other foot can no longer confirm it: too much time has
+    passed, or control was lost."""
+    if state.pending_foot is None:
+        return state
+    # A turn in time that is still travelling far enough to become a contact may yet answer it.
+    answer_coming = state.turn_t_s is not None and state.turn_t_s - state.pending_t_s <= cfg.ticktock_max_arrival_s
+    if state.lost or (t_s - state.pending_t_s > cfg.ticktock_max_arrival_s and not answer_coming):
+        return replace(state, pending_foot=None, pending_t_s=None, pending_crossed=False)
+    return state
+
+
 def step(state: State, obs: Observation, cfg) -> tuple:
     """Advance one frame. Returns (new_state, events)."""
     events = []
@@ -284,6 +367,7 @@ def step(state: State, obs: Observation, cfg) -> tuple:
         events += new_events
     state, new_events = _step_lost_control(state, obs, distances, cfg)
     events += new_events
+    state = _expire_pending(state, obs.t_s, cfg)
     state, new_events = _step_head(state, obs, cfg)
     events += new_events
     return state, events
