@@ -1,6 +1,6 @@
 """Hand-label a clip by pressing keys while it plays: touches, lost control, head down.
 
-Usage: python -m src.label_clip data/clips/<session>/<clip>.mp4 [--focus touches|lost|head|all]
+Usage: python -m src.label_clip data/clips/<tune|test>/<session>/<clip>.mp4 [--focus touches|lost|head|all]
                                 [--out data/labels/<clip>.csv]
 
 Each key press is stamped with the current frame's real timestamp, read the same way as the

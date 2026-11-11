@@ -180,8 +180,7 @@ def summarize(records: list, cache, cfg: Config) -> dict:
         "low_foot_visibility_pct": float(100 * np.mean(~(visibility >= cfg.pose_min_visibility))),
         "ball_found_pct": 100 * float(np.mean([r["ball"] is not None for r in records])),
         "ball_tracked_pct": 100 * float(np.mean([r["ball_xy"] is not None for r in records])),
-        "searching_pct": 100 * float(np.mean([r["searched_full_frame"] for r in records])),
-        # Tick-tocks: contacts that sent the ball across to the other foot.
+        "searching_pct": 100 * float(np.mean([r["searched_full_frame"] for r in records])),        # Tick-tocks: contacts that sent the ball across to the other foot.
         "touches": {
             "left": sum(e.foot == "left" for e in touches),
             "right": sum(e.foot == "right" for e in touches),
