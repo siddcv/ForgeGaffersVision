@@ -1,0 +1,728 @@
+{
+  "summary": {
+    "frames": 963,
+    "duration_s": 16.035,
+    "frame_gap_ms": {
+      "median": 16.666999999999987,
+      "max": 18.333000000000155
+    },
+    "timestamps_strictly_increasing": true,
+    "low_foot_visibility_pct": 0.363447559709242,
+    "ball_found_pct": 71.85877466251299,
+    "ball_tracked_pct": 83.90446521287642,
+    "searching_pct": 15.680166147455868,
+    "touches": {
+      "left": 12,
+      "right": 15
+    },
+    "contacts": {
+      "left": 17,
+      "right": 16
+    },
+    "touches_per_minute": {
+      "goal": 150,
+      "touches": 27,
+      "drill_s": 11.55,
+      "average": 135.1,
+      "best_minute": null,
+      "peak_pace": 210.6,
+      "goal_met": null
+    },
+    "mean_speed_mps": {
+      "left": 2.343099131735754,
+      "right": 2.5309066105688034
+    },
+    "lost_control": 2,
+    "resets": 1,
+    "head_down": 1,
+    "mean_touch_latency_ms": 341.9751851851852
+  },
+  "events": [
+    {
+      "kind": "contact",
+      "t_s": 0.966667,
+      "reported_t_s": 1.0,
+      "foot": "left",
+      "value": null
+    },
+    {
+      "kind": "speed",
+      "t_s": 1.0,
+      "reported_t_s": 1.1,
+      "foot": "left",
+      "value": 2.0393449265432677
+    },
+    {
+      "kind": "contact",
+      "t_s": 1.2,
+      "reported_t_s": 1.233333,
+      "foot": "right",
+      "value": null
+    },
+    {
+      "kind": "touch",
+      "t_s": 0.966667,
+      "reported_t_s": 1.233333,
+      "foot": "left",
+      "value": null
+    },
+    {
+      "kind": "speed",
+      "t_s": 1.233333,
+      "reported_t_s": 1.333333,
+      "foot": "right",
+      "value": 2.5314823571374565
+    },
+    {
+      "kind": "contact",
+      "t_s": 1.466667,
+      "reported_t_s": 1.5,
+      "foot": "left",
+      "value": null
+    },
+    {
+      "kind": "touch",
+      "t_s": 1.2,
+      "reported_t_s": 1.5,
+      "foot": "right",
+      "value": null
+    },
+    {
+      "kind": "speed",
+      "t_s": 1.5,
+      "reported_t_s": 1.6,
+      "foot": "left",
+      "value": 2.5222386042481
+    },
+    {
+      "kind": "contact",
+      "t_s": 1.716667,
+      "reported_t_s": 1.75,
+      "foot": "right",
+      "value": null
+    },
+    {
+      "kind": "touch",
+      "t_s": 1.466667,
+      "reported_t_s": 1.75,
+      "foot": "left",
+      "value": null
+    },
+    {
+      "kind": "speed",
+      "t_s": 1.75,
+      "reported_t_s": 1.85,
+      "foot": "right",
+      "value": 3.2413107885512797
+    },
+    {
+      "kind": "contact",
+      "t_s": 2.0,
+      "reported_t_s": 2.133333,
+      "foot": "left",
+      "value": null
+    },
+    {
+      "kind": "touch",
+      "t_s": 1.716667,
+      "reported_t_s": 2.133333,
+      "foot": "right",
+      "value": null
+    },
+    {
+      "kind": "speed",
+      "t_s": 2.133333,
+      "reported_t_s": 2.233333,
+      "foot": "left",
+      "value": 2.101664814162934
+    },
+    {
+      "kind": "contact",
+      "t_s": 2.366667,
+      "reported_t_s": 2.4,
+      "foot": "right",
+      "value": null
+    },
+    {
+      "kind": "touch",
+      "t_s": 2.0,
+      "reported_t_s": 2.4,
+      "foot": "left",
+      "value": null
+    },
+    {
+      "kind": "speed",
+      "t_s": 2.4,
+      "reported_t_s": 2.5,
+      "foot": "right",
+      "value": 2.9713405526040244
+    },
+    {
+      "kind": "contact",
+      "t_s": 2.666667,
+      "reported_t_s": 2.7,
+      "foot": "left",
+      "value": null
+    },
+    {
+      "kind": "touch",
+      "t_s": 2.366667,
+      "reported_t_s": 2.7,
+      "foot": "right",
+      "value": null
+    },
+    {
+      "kind": "speed",
+      "t_s": 2.7,
+      "reported_t_s": 2.816667,
+      "foot": "left",
+      "value": 5.654834443149566
+    },
+    {
+      "kind": "contact",
+      "t_s": 2.9,
+      "reported_t_s": 2.95,
+      "foot": "right",
+      "value": null
+    },
+    {
+      "kind": "touch",
+      "t_s": 2.666667,
+      "reported_t_s": 2.95,
+      "foot": "left",
+      "value": null
+    },
+    {
+      "kind": "speed",
+      "t_s": 2.95,
+      "reported_t_s": 3.066667,
+      "foot": "right",
+      "value": 4.58557035821309
+    },
+    {
+      "kind": "contact",
+      "t_s": 3.233333,
+      "reported_t_s": 3.283333,
+      "foot": "left",
+      "value": null
+    },
+    {
+      "kind": "touch",
+      "t_s": 2.9,
+      "reported_t_s": 3.283333,
+      "foot": "right",
+      "value": null
+    },
+    {
+      "kind": "speed",
+      "t_s": 3.283333,
+      "reported_t_s": 3.383333,
+      "foot": "left",
+      "value": 2.365469751841125
+    },
+    {
+      "kind": "contact",
+      "t_s": 3.516667,
+      "reported_t_s": 3.55,
+      "foot": "right",
+      "value": null
+    },
+    {
+      "kind": "touch",
+      "t_s": 3.233333,
+      "reported_t_s": 3.55,
+      "foot": "left",
+      "value": null
+    },
+    {
+      "kind": "speed",
+      "t_s": 3.55,
+      "reported_t_s": 3.65,
+      "foot": "right",
+      "value": 1.8716402529486909
+    },
+    {
+      "kind": "contact",
+      "t_s": 3.833333,
+      "reported_t_s": 3.866667,
+      "foot": "left",
+      "value": null
+    },
+    {
+      "kind": "touch",
+      "t_s": 3.516667,
+      "reported_t_s": 3.866667,
+      "foot": "right",
+      "value": null
+    },
+    {
+      "kind": "speed",
+      "t_s": 3.866667,
+      "reported_t_s": 3.966667,
+      "foot": "left",
+      "value": 2.6852474162594646
+    },
+    {
+      "kind": "contact",
+      "t_s": 4.066667,
+      "reported_t_s": 4.1,
+      "foot": "right",
+      "value": null
+    },
+    {
+      "kind": "touch",
+      "t_s": 3.833333,
+      "reported_t_s": 4.1,
+      "foot": "left",
+      "value": null
+    },
+    {
+      "kind": "speed",
+      "t_s": 4.1,
+      "reported_t_s": 4.2,
+      "foot": "right",
+      "value": 2.177739403998914
+    },
+    {
+      "kind": "head_down",
+      "t_s": 3.283333,
+      "reported_t_s": 4.283333,
+      "foot": null,
+      "value": null
+    },
+    {
+      "kind": "contact",
+      "t_s": 4.4,
+      "reported_t_s": 4.45,
+      "foot": "left",
+      "value": null
+    },
+    {
+      "kind": "touch",
+      "t_s": 4.066667,
+      "reported_t_s": 4.45,
+      "foot": "right",
+      "value": null
+    },
+    {
+      "kind": "speed",
+      "t_s": 4.45,
+      "reported_t_s": 4.7,
+      "foot": "left",
+      "value": 0.9884727824004247
+    },
+    {
+      "kind": "contact",
+      "t_s": 4.8,
+      "reported_t_s": 4.966667,
+      "foot": "left",
+      "value": null
+    },
+    {
+      "kind": "speed",
+      "t_s": 4.966667,
+      "reported_t_s": 5.033333,
+      "foot": "left",
+      "value": 0.7139564311014243
+    },
+    {
+      "kind": "contact",
+      "t_s": 4.966667,
+      "reported_t_s": 5.033333,
+      "foot": "right",
+      "value": null
+    },
+    {
+      "kind": "touch",
+      "t_s": 4.8,
+      "reported_t_s": 5.033333,
+      "foot": "left",
+      "value": null
+    },
+    {
+      "kind": "speed",
+      "t_s": 5.033333,
+      "reported_t_s": 5.133333,
+      "foot": "right",
+      "value": 0.7104811568536815
+    },
+    {
+      "kind": "contact",
+      "t_s": 5.65,
+      "reported_t_s": 5.683333,
+      "foot": "right",
+      "value": null
+    },
+    {
+      "kind": "speed",
+      "t_s": 5.683333,
+      "reported_t_s": 5.8,
+      "foot": "right",
+      "value": 2.589095744291031
+    },
+    {
+      "kind": "contact",
+      "t_s": 5.883333,
+      "reported_t_s": 5.916667,
+      "foot": "left",
+      "value": null
+    },
+    {
+      "kind": "touch",
+      "t_s": 5.65,
+      "reported_t_s": 5.916667,
+      "foot": "right",
+      "value": null
+    },
+    {
+      "kind": "speed",
+      "t_s": 5.916667,
+      "reported_t_s": 6.033333,
+      "foot": "left",
+      "value": 1.3597858994080865
+    },
+    {
+      "kind": "contact",
+      "t_s": 6.183333,
+      "reported_t_s": 6.216667,
+      "foot": "right",
+      "value": null
+    },
+    {
+      "kind": "head_up",
+      "t_s": 6.233333,
+      "reported_t_s": 6.233333,
+      "foot": null,
+      "value": 2.95
+    },
+    {
+      "kind": "speed",
+      "t_s": 6.216667,
+      "reported_t_s": 6.333333,
+      "foot": "right",
+      "value": 1.3564626271015414
+    },
+    {
+      "kind": "contact",
+      "t_s": 6.45,
+      "reported_t_s": 6.483333,
+      "foot": "left",
+      "value": null
+    },
+    {
+      "kind": "touch",
+      "t_s": 6.183333,
+      "reported_t_s": 6.483333,
+      "foot": "right",
+      "value": null
+    },
+    {
+      "kind": "speed",
+      "t_s": 6.483333,
+      "reported_t_s": 6.6,
+      "foot": "left",
+      "value": 2.347847811274816
+    },
+    {
+      "kind": "contact",
+      "t_s": 6.7,
+      "reported_t_s": 6.733333,
+      "foot": "right",
+      "value": null
+    },
+    {
+      "kind": "touch",
+      "t_s": 6.45,
+      "reported_t_s": 6.733333,
+      "foot": "left",
+      "value": null
+    },
+    {
+      "kind": "speed",
+      "t_s": 6.733333,
+      "reported_t_s": 6.85,
+      "foot": "right",
+      "value": 2.5491013015453228
+    },
+    {
+      "kind": "contact",
+      "t_s": 6.966667,
+      "reported_t_s": 7.016667,
+      "foot": "left",
+      "value": null
+    },
+    {
+      "kind": "touch",
+      "t_s": 6.7,
+      "reported_t_s": 7.016667,
+      "foot": "right",
+      "value": null
+    },
+    {
+      "kind": "speed",
+      "t_s": 7.016667,
+      "reported_t_s": 7.133333,
+      "foot": "left",
+      "value": 2.229053934511711
+    },
+    {
+      "kind": "lost_control",
+      "t_s": 7.4,
+      "reported_t_s": 7.9,
+      "foot": null,
+      "value": null
+    },
+    {
+      "kind": "reset",
+      "t_s": 9.083333,
+      "reported_t_s": 9.083333,
+      "foot": null,
+      "value": null
+    },
+    {
+      "kind": "contact",
+      "t_s": 9.3,
+      "reported_t_s": 9.333333,
+      "foot": "right",
+      "value": null
+    },
+    {
+      "kind": "speed",
+      "t_s": 9.333333,
+      "reported_t_s": 9.45,
+      "foot": "right",
+      "value": 2.2185840376567705
+    },
+    {
+      "kind": "contact",
+      "t_s": 9.616667,
+      "reported_t_s": 9.65,
+      "foot": "left",
+      "value": null
+    },
+    {
+      "kind": "touch",
+      "t_s": 9.3,
+      "reported_t_s": 9.65,
+      "foot": "right",
+      "value": null
+    },
+    {
+      "kind": "speed",
+      "t_s": 9.65,
+      "reported_t_s": 9.766667,
+      "foot": "left",
+      "value": 2.1288881404864592
+    },
+    {
+      "kind": "contact",
+      "t_s": 9.866667,
+      "reported_t_s": 9.883333,
+      "foot": "right",
+      "value": null
+    },
+    {
+      "kind": "touch",
+      "t_s": 9.616667,
+      "reported_t_s": 9.883333,
+      "foot": "left",
+      "value": null
+    },
+    {
+      "kind": "speed",
+      "t_s": 9.883333,
+      "reported_t_s": 10.0,
+      "foot": "right",
+      "value": 2.1644672431991316
+    },
+    {
+      "kind": "contact",
+      "t_s": 10.15,
+      "reported_t_s": 10.216667,
+      "foot": "left",
+      "value": null
+    },
+    {
+      "kind": "touch",
+      "t_s": 9.866667,
+      "reported_t_s": 10.216667,
+      "foot": "right",
+      "value": null
+    },
+    {
+      "kind": "speed",
+      "t_s": 10.216667,
+      "reported_t_s": 10.316667,
+      "foot": "left",
+      "value": 3.546933149011902
+    },
+    {
+      "kind": "contact",
+      "t_s": 10.45,
+      "reported_t_s": 10.483333,
+      "foot": "right",
+      "value": null
+    },
+    {
+      "kind": "touch",
+      "t_s": 10.15,
+      "reported_t_s": 10.483333,
+      "foot": "left",
+      "value": null
+    },
+    {
+      "kind": "speed",
+      "t_s": 10.483333,
+      "reported_t_s": 10.75,
+      "foot": "right",
+      "value": 3.2527680546808577
+    },
+    {
+      "kind": "contact",
+      "t_s": 10.75,
+      "reported_t_s": 10.833333,
+      "foot": "left",
+      "value": null
+    },
+    {
+      "kind": "touch",
+      "t_s": 10.45,
+      "reported_t_s": 10.833333,
+      "foot": "right",
+      "value": null
+    },
+    {
+      "kind": "speed",
+      "t_s": 10.833333,
+      "reported_t_s": 10.95,
+      "foot": "left",
+      "value": 2.4315361600719547
+    },
+    {
+      "kind": "contact",
+      "t_s": 11.0,
+      "reported_t_s": 11.033333,
+      "foot": "right",
+      "value": null
+    },
+    {
+      "kind": "speed",
+      "t_s": 11.033333,
+      "reported_t_s": 11.166667,
+      "foot": "right",
+      "value": 2.218988241173918
+    },
+    {
+      "kind": "contact",
+      "t_s": 11.333333,
+      "reported_t_s": 11.433333,
+      "foot": "left",
+      "value": null
+    },
+    {
+      "kind": "touch",
+      "t_s": 11.0,
+      "reported_t_s": 11.433333,
+      "foot": "right",
+      "value": null
+    },
+    {
+      "kind": "speed",
+      "t_s": 11.433333,
+      "reported_t_s": 11.533333,
+      "foot": "left",
+      "value": 2.479567011376467
+    },
+    {
+      "kind": "contact",
+      "t_s": 11.683333,
+      "reported_t_s": 11.716667,
+      "foot": "right",
+      "value": null
+    },
+    {
+      "kind": "touch",
+      "t_s": 11.333333,
+      "reported_t_s": 11.716667,
+      "foot": "left",
+      "value": null
+    },
+    {
+      "kind": "speed",
+      "t_s": 11.716667,
+      "reported_t_s": 11.816667,
+      "foot": "right",
+      "value": 3.739342732492927
+    },
+    {
+      "kind": "contact",
+      "t_s": 12.05,
+      "reported_t_s": 12.183333,
+      "foot": "left",
+      "value": null
+    },
+    {
+      "kind": "touch",
+      "t_s": 11.683333,
+      "reported_t_s": 12.183333,
+      "foot": "right",
+      "value": null
+    },
+    {
+      "kind": "speed",
+      "t_s": 12.183333,
+      "reported_t_s": 12.283333,
+      "foot": "left",
+      "value": 2.456679664238099
+    },
+    {
+      "kind": "contact",
+      "t_s": 12.516667,
+      "reported_t_s": 12.55,
+      "foot": "right",
+      "value": null
+    },
+    {
+      "kind": "touch",
+      "t_s": 12.05,
+      "reported_t_s": 12.55,
+      "foot": "left",
+      "value": null
+    },
+    {
+      "kind": "speed",
+      "t_s": 12.55,
+      "reported_t_s": 12.666667,
+      "foot": "right",
+      "value": 2.316130916652211
+    },
+    {
+      "kind": "contact",
+      "t_s": 12.833333,
+      "reported_t_s": 12.866667,
+      "foot": "left",
+      "value": null
+    },
+    {
+      "kind": "touch",
+      "t_s": 12.516667,
+      "reported_t_s": 12.866667,
+      "foot": "right",
+      "value": null
+    },
+    {
+      "kind": "speed",
+      "t_s": 12.866667,
+      "reported_t_s": 12.983333,
+      "foot": "left",
+      "value": 1.7811642994220138
+    },
+    {
+      "kind": "lost_control",
+      "t_s": 14.583333,
+      "reported_t_s": 15.083333,
+      "foot": null,
+      "value": null
+    }
+  ]
+}

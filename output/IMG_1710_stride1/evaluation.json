@@ -1,0 +1,85 @@
+{
+  "clip": "IMG_1710",
+  "drill_window_s": [
+    null,
+    null
+  ],
+  "results": {
+    "touch": {
+      "tolerance_s": 0.2,
+      "labelled": 30,
+      "detected": 27,
+      "hits": 26,
+      "misses": 4,
+      "false_alarms": 1,
+      "precision": 0.9629629629629629,
+      "recall": 0.8666666666666667,
+      "f1": 0.912280701754386,
+      "median_timing_error_ms": 25.000000000000355,
+      "mean_latency_ms": 346.1537307692307,
+      "missed_at_s": [
+        0.733,
+        5.367,
+        5.983,
+        10.8
+      ],
+      "false_alarm_at_s": [
+        4.8
+      ],
+      "foot_accuracy": 1.0,
+      "wrong_foot_at_s": []
+    },
+    "lost_control": {
+      "tolerance_s": 0.5,
+      "labelled": 0,
+      "detected": 2,
+      "hits": 0,
+      "misses": 0,
+      "false_alarms": 2,
+      "precision": 0.0,
+      "recall": null,
+      "f1": null,
+      "median_timing_error_ms": null,
+      "mean_latency_ms": null,
+      "missed_at_s": [],
+      "false_alarm_at_s": [
+        7.4,
+        14.583
+      ]
+    },
+    "reset": {
+      "tolerance_s": 0.5,
+      "labelled": 0,
+      "detected": 1,
+      "hits": 0,
+      "misses": 0,
+      "false_alarms": 1,
+      "precision": 0.0,
+      "recall": null,
+      "f1": null,
+      "median_timing_error_ms": null,
+      "mean_latency_ms": null,
+      "missed_at_s": [],
+      "false_alarm_at_s": [
+        9.083
+      ]
+    },
+    "head_down": {
+      "tolerance_s": 0.5,
+      "labelled": 0,
+      "detected": 1,
+      "hits": 0,
+      "misses": 0,
+      "false_alarms": 1,
+      "precision": 0.0,
+      "recall": null,
+      "f1": null,
+      "median_timing_error_ms": null,
+      "mean_latency_ms": null,
+      "missed_at_s": [],
+      "false_alarm_at_s": [
+        3.283
+      ]
+    }
+  }
+}
