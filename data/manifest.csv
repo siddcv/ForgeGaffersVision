@@ -7,3 +7,4 @@ clip,session,date,player,take,device,camera,fps,resolution,orientation,height_m,
 20261102_134245,2026-11-02_classroom,2026-11-02,,tick-tock,,,60,1080x1920,portrait,,,,indoor overhead lights + window,wood floor,5,,,,,tune,second classroom take ~1 min after 20261102_134129; setup fields assumed same session - confirm
 20261102_134948,2026-11-02_classroom,2026-11-02,,tick-tock,,,60,1080x1920,portrait,,,,indoor overhead lights + window,wood floor,5,,,,,tune,third classroom take ~7 min after 20261102_134245; 31.2 s; setup fields assumed same session - confirm
 20261102_135033,2026-11-02_classroom,2026-11-02,,tick-tock,,,60,1080x1920,portrait,,,,indoor overhead lights + window,wood floor,5,,,,,tune,fourth classroom take ~1 min after 20261102_134948; 30.9 s; setup fields assumed same session - confirm
+IMG_1710,2026-11-02_classroom,,,tick-tock,iPhone,,60,1080x1920,portrait,,,,indoor,,5,,,,,tune,iPhone HEVC .MOV (rotation -90); 16.0 s; date and setup fields unknown - confirm

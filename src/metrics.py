@@ -214,6 +214,10 @@ def _step_ball(state: State, obs: Observation, distances: tuple, cfg) -> tuple:
     min_travel_px = cfg.touch_min_travel_diam * diameter
     run_start_x = state.run_start_x if state.run_start_x is not None else state.last_ball_xy[0]
 
+    # TODO: touches that start from a still ball (first touch of the drill, restart after lost
+    # control) are never contacts, since only a reversal counts (IMG_1710 0.733 s). Candidate fix:
+    # a "launch from rest" contact by the foot the ball moves away from, after the ball has been
+    # below touch_min_speed_mps for a set time. Score on all tune clips before keeping.
     if is_reversal(state.last_vx_mps, vx, cfg.touch_min_speed_mps):
         turn_x = state.last_ball_xy[0]
         travelled_in = abs(turn_x - run_start_x)
