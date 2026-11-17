@@ -101,11 +101,21 @@ class SearchState:
     crop_miss_since_s: float | None = None
 
 
+def needs_full_frame(state: SearchState, t_s: float, crop: Box | None, crop_det, cfg) -> bool:
+    """True when search_step will read full_det this frame, so live code runs the full-frame
+    detector only then. Must stay in step with the branches of search_step."""
+    if state.searching:
+        return True
+    if crop_det is not None:
+        return False
+    miss_since = state.crop_miss_since_s if state.crop_miss_since_s is not None else t_s
+    return crop is None or t_s - miss_since >= cfg.ball_search_after_s
+
+
 def search_step(state: SearchState, t_s: float, crop: Box | None, crop_det, full_det, cfg):
     """Choose this frame's detection. Returns (state, detection, searched_full_frame).
 
-    Both detections are supplied because replay reads them from the cache; on a
-    phone, full_det would only be computed when state.searching is true.
+    full_det is only read when needs_full_frame() is true; pass None otherwise.
     """
     if state.searching:
         if full_det is None:

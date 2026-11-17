@@ -47,6 +47,7 @@ Clips live in `data/clips/tune/<session>/` (used to choose thresholds) or `data/
 ## Architecture
 Per-frame pipeline: frame + real timestamp -> pose (MediaPipe Pose) -> ball detection -> head pitch (MediaPipe Face Landmarker, ~5-10 Hz) -> causal filters (One Euro for keypoints, Kalman for the ball) -> rule-based metrics.
 
+- **Shared per-frame logic:** `FramePipeline.step` in `src/pipeline.py` runs everything after the models (smoothing, search switch, tracker, metrics). Replay calls it on cached outputs; live code and the Swift port follow the same steps.
 - **Ball search modes:** the detector normally runs on a foot crop derived from pose. After repeated misses it searches the full frame. A crop miss alone never counts as lost control. `ball.py` owns the switch; `metrics.py` receives a `searched_full_frame` flag.
 - **Foot crop size:** the untuned detector misses balls that look too large or too small in its input (it works at about 40-80 px). The crop is therefore square, sized so the last seen ball fills `crop_ball_frac` of it, padded with gray past the frame edge, and run at `crop_imgsz`.
 - **Ball tracking:** `BallTracker` in `ball.py` picks, among several candidate boxes, the one nearest the Kalman prediction, and predicts through gaps up to `track_max_predict_s` (never while searching). Metrics receive detections only; predictions are for the overlay and future frame skipping, since feeding them to the touch rule added false touches on real clips.

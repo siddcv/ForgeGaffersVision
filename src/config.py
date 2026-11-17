@@ -57,6 +57,7 @@ class Config:
     ball_confidence: float = 0.15
     ball_class_id: int = 32  # COCO "sports ball"
     ball_candidates: int = 3  # boxes kept per frame, so the tracker can pick the one that fits
+    ball_nms_iou: float = 0.7  # overlap above which a lower-scoring box is dropped (Ultralytics' default)
     detector_weights: str = "yolov8n.pt"
 
     crop_imgsz: int = 320  # detector input size for the foot crop
