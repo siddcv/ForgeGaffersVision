@@ -88,7 +88,9 @@ def replay(cache, cfg: Config, stride: int = 1) -> list:
     def smooth_points(indices, points_at, t_s):
         smoothed = []
         for index in indices:
-            if points_at[index, 2] < cfg.pose_min_visibility:
+            # Written as "not >=" so a frame with no pose (NaN) is skipped too: one NaN fed to a
+            # One Euro filter stays in its state and turns every later foot position into NaN.
+            if not points_at[index, 2] >= cfg.pose_min_visibility:
                 continue
             xy = []
             for axis in (0, 1):
