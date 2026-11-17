@@ -84,13 +84,13 @@ logic costs essentially nothing; the two neural networks are the whole budget.
 1. [x] **One shared per-frame function.** `FramePipeline.step` in `src/pipeline.py`, used by replay
        and (next) live, and mirrored later in Swift. Full-frame candidates are requested only when
        `ball.needs_full_frame` says so (6.7% of frames across the cached clips).
-2. [ ] **Preprocessing spec** (`docs/PREPROCESSING.md`): input sizes, crop rules, padding, channel
+2. [x] **Preprocessing spec** (`docs/PREPROCESSING.md`): input sizes, crop rules, padding, channel
        order, normalization. The Swift version must match it exactly.
 3. [ ] **Detector choice:** check the licence, and convert each candidate to Core ML in WSL
        (`coremltools` does not run natively on Windows; conversion works in WSL, running and profiling
        need a Mac). Then run the fine-tuning pilot in `FINE_TUNING.md`.
-4. [ ] **Portable test vectors:** export the `tests/test_metrics.py` cases as JSON (input frames,
-       expected events) so the Swift port passes the same answers.
+4. [x] **Portable test vectors** (`tests/vectors/`, see its README): 25 metric scenarios, the
+       filters, the search switch, and 10 s of a real clip through `FramePipeline.step`.
 5. [ ] **Fix the rule gaps while they are cheap in Python:** starting from rest (TODO in
        `metrics.py`), crossings not seen between contacts, the drill window, and the tick-tock delay.
 

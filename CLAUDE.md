@@ -38,6 +38,13 @@ python -m src.label_clip data/clips/<tune|test>/<session>/<clip>.mp4
 
 # Score a run against hand labels: writes output/<clip>_stride<N>/evaluation.json
 python -m src.evaluate output/<clip>_stride1/report.json
+
+# Portable test vectors for the Swift port (tests/vectors/): re-run after an intended logic or config change
+python -m scripts.export_test_vectors
+
+# Detector: export to ONNX and time it on CPU threads (Windows); Core ML export and check (macOS only)
+python -m scripts.bench_detector data/clips/tune/<session>/<clip>.mp4
+python -m scripts.export_coreml
 ```
 
 Clips live in `data/clips/tune/<session>/` (used to choose thresholds) or `data/clips/test/<session>/` (held out, scored once at the end), with one row per clip in `data/manifest.csv` and hand labels in `data/labels/<clip>.csv`; see `data/README.md`.

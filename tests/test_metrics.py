@@ -4,7 +4,9 @@ import pytest
 
 from src.config import Config
 from src.metrics import Observation, foot_by_direction, initial_state, step
-from tests.synth import DIAMETER_PX, LEFT_FOOT, RIGHT_FOOT, Y, synth_tick_tock
+from tests.synth import (
+    DIAMETER_PX, LEFT_FOOT, RIGHT_FOOT, Y, ball_at, head, missing, path, synth_tick_tock,
+)
 
 CFG = Config()
 
@@ -120,22 +122,6 @@ def test_touch_survives_a_brief_occlusion_at_the_foot():
 # Tick-tocks: the ball must cross the midpoint and the other foot must make the next contact.
 # Feet at x 200 (left) and 400 (right), midpoint 300; the ball turns at 240 / 360 in a normal touch.
 
-def path(waypoints, fps=60.0, speed_px_s=300.0, start_t=0.0, feet=(LEFT_FOOT, RIGHT_FOOT)):
-    """Ball moving at constant speed through the given x positions, turning at each one."""
-    observations, t = [], start_t
-    x = waypoints[0]
-    for target in waypoints[1:]:
-        while abs(target - x) > 1e-9:
-            t += 1 / fps
-            step_px = min(speed_px_s / fps, abs(target - x))
-            x += step_px if target > x else -step_px
-            observations.append(Observation(
-                t_s=t, ball_xy=(x, Y), ball_diameter_px=DIAMETER_PX,
-                left_foot=feet[0], right_foot=feet[1],
-            ))
-    return observations
-
-
 def contacts_and_touches(observations, cfg=CFG):
     events = run(observations, cfg)
     return [c.foot for c in kinds(events, "contact")], [t.foot for t in kinds(events, "touch")]
@@ -243,16 +229,6 @@ def test_ball_size_changes_reported_speed():
     assert size3 == pytest.approx(size5 * 0.190 / 0.220)
 
 
-def missing(n_frames, searched, start=0.0):
-    return [
-        Observation(
-            t_s=start + i / 30, searched_full_frame=searched,
-            left_foot=LEFT_FOOT, right_foot=RIGHT_FOOT,
-        )
-        for i in range(n_frames)
-    ]
-
-
 def test_crop_miss_without_search_is_never_lost_control():
     assert kinds(run(missing(120, searched=False)), "lost_control") == []
 
@@ -265,16 +241,6 @@ def test_full_frame_miss_at_limit_is_lost_control_once():
     assert len(kinds(run(missing(60, searched=True)), "lost_control")) == 1
 
 
-def ball_at(x, n_frames, start=0.0):
-    return [
-        Observation(
-            t_s=start + i / 30, ball_xy=(x, Y), ball_diameter_px=DIAMETER_PX,
-            left_foot=LEFT_FOOT, right_foot=RIGHT_FOOT,
-        )
-        for i in range(n_frames)
-    ]
-
-
 def test_far_ball_is_lost_control_then_reset_when_it_returns():
     events = run(ball_at(1000.0, 30) + ball_at(240.0, 3, start=1.0))
     assert len(kinds(events, "lost_control")) == 1
@@ -283,10 +249,6 @@ def test_far_ball_is_lost_control_then_reset_when_it_returns():
 
 def test_normal_play_has_no_lost_control():
     assert kinds(run(synth_tick_tock(20)), "lost_control") == []
-
-
-def head(pitches, fps=30):
-    return [Observation(t_s=i / fps, head_pitch_deg=p) for i, p in enumerate(pitches)]
 
 
 def test_head_down_just_under_one_second_is_not_reported():
