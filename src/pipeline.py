@@ -20,6 +20,7 @@ from .filters import OneEuroFilter
 from .pose import LEFT_FOOT, RIGHT_FOOT, coarse_head_pitch_deg, visible_points
 
 Candidates = Sequence[tuple]  # (x1, y1, x2, y2, confidence) in full-frame pixels
+POSE_PITCH = object()  # step(head_pitch_deg=...) default: the rough pose-only estimate
 
 
 class FramePipeline:
@@ -64,9 +65,17 @@ class FramePipeline:
         crop,
         crop_candidates: Candidates,
         full_candidates: Candidates | Callable[[], Candidates],
+        head_pitch_deg=POSE_PITCH,
     ) -> dict:
-        """Process one frame. landmarks is a (33, 3) array of pixel x, pixel y, visibility."""
+        """Process one frame. landmarks is a (33, 3) array of pixel x, pixel y, visibility.
+
+        head_pitch_deg is the Face Landmarker pitch (None when no face was found this frame).
+        Leave it out to use the rough pose-only estimate instead, which is on a different scale:
+        the head thresholds in config are calibrated for Face Landmarker pitch.
+        """
         cfg = self.cfg
+        if head_pitch_deg is POSE_PITCH:
+            head_pitch_deg = coarse_head_pitch_deg(landmarks, cfg.pose_min_visibility)
         left_foot = self._smooth_points(LEFT_FOOT, landmarks, t_s)
         right_foot = self._smooth_points(RIGHT_FOOT, landmarks, t_s)
         feet = left_foot + right_foot
@@ -91,11 +100,12 @@ class FramePipeline:
             searched_full_frame=searched,
             left_foot=left_foot,
             right_foot=right_foot,
-            head_pitch_deg=coarse_head_pitch_deg(landmarks, cfg.pose_min_visibility),
+            head_pitch_deg=head_pitch_deg,
         )
         self.metrics_state, events = metrics.step(self.metrics_state, observation, cfg)
         return {
             "t_s": t_s, "crop": crop, "ball": detection, "ball_xy": ball_xy,
             "predicted": predicted, "searched_full_frame": searched, "ran_full_frame": ran_full_frame,
             "events": events, "touch_rate": metrics.touch_rate(self.metrics_state, t_s, cfg),
+            "head_pitch_deg": head_pitch_deg,
         }

@@ -15,7 +15,7 @@ from src import ball as ball_module
 from src import metrics
 from src.config import Config
 from src.filters import Kalman1D, OneEuroFilter
-from src.pipeline import FramePipeline
+from src.pipeline import POSE_PITCH, FramePipeline
 
 VECTORS = Path(__file__).parent / "vectors"
 ABS_TOL, REL_TOL = 1e-6, 1e-9  # the README states the same tolerance for ports
@@ -122,6 +122,7 @@ def test_pipeline_vector(path):
         record = pipeline.step(
             given["t_s"], landmarks, tuples(given["crop"]),
             tuples(given["crop_candidates"]), lambda: tuples(given["full_candidates"]),
+            given.get("head_pitch_deg", POSE_PITCH),
         )
         actual = {key: record[key] for key in frame["expected"]}
         assert_close(frame["expected"], plain(actual), f"{path.stem} frame {i}")

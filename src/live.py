@@ -33,7 +33,8 @@ from . import ball as ball_module
 from .config import Config
 from .onnx_detector import OnnxBallDetector, export_onnx
 from .overlay import Hud, draw
-from .pipeline import FramePipeline
+from .face_pose import open_head_pitch_sampler
+from .pipeline import POSE_PITCH, FramePipeline
 from .pose import PoseEstimator
 from .video_io import iter_frames, timestamps_path
 
@@ -201,6 +202,7 @@ def main() -> None:
     sizes = (cfg.crop_imgsz, cfg.full_imgsz)
     detector = OnnxBallDetector(cfg, {size: export_onnx(cfg.detector_weights, size) for size in sizes}, args.threads)
     pose = PoseEstimator()
+    head_sampler, face_pose = open_head_pitch_sampler(cfg)  # head pitch at 10 Hz, as in replay
 
     is_camera = args.source.isdigit()
     started = datetime.now()
@@ -233,8 +235,9 @@ def main() -> None:
             if crop is not None:
                 image = ball_module.crop_image(bgr, crop, cfg.crop_pad_value)
                 crop_candidates = [ball_module.to_full_frame(d, crop) for d in detector.detect(image, cfg.crop_imgsz)]
+            head_pitch = head_sampler.update(bgr, landmarks, t_s, t_ms) if head_sampler else POSE_PITCH
             record = pipeline.step(t_s, landmarks, crop, crop_candidates,
-                                   lambda: detector.detect(bgr, cfg.full_imgsz))
+                                   lambda: detector.detect(bgr, cfg.full_imgsz), head_pitch)
             proc_ms.append((time.perf_counter() - start) * 1000)
             lag_ms.append((time.monotonic() - arrival) * 1000)
             full_frame_runs += record["ran_full_frame"]
@@ -256,6 +259,8 @@ def main() -> None:
     finally:
         source.stop()
         pose.close()
+        if face_pose is not None:
+            face_pose.close()
         if not args.no_window:
             cv2.destroyAllWindows()
 

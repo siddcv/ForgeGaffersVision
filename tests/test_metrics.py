@@ -5,10 +5,11 @@ import pytest
 from src.config import Config
 from src.metrics import Observation, foot_by_direction, initial_state, step
 from tests.synth import (
-    DIAMETER_PX, LEFT_FOOT, RIGHT_FOOT, Y, ball_at, head, missing, path, synth_tick_tock,
+    DIAMETER_PX, LEFT_FOOT, RIGHT_FOOT, Y, ball_at, head, head_levels, missing, path, synth_tick_tock,
 )
 
 CFG = Config()
+UP, DOWN, BETWEEN = head_levels(CFG)
 
 
 def run(observations, cfg=CFG):
@@ -252,18 +253,18 @@ def test_normal_play_has_no_lost_control():
 
 
 def test_head_down_just_under_one_second_is_not_reported():
-    assert kinds(run(head([-30.0] * 30)), "head_down") == []
+    assert kinds(run(head([DOWN] * 30)), "head_down") == []
 
 
 def test_head_down_over_one_second_is_reported_with_start_time():
-    events = kinds(run(head([0.0] * 30 + [-30.0] * 40)), "head_down")
+    events = kinds(run(head([UP] * 30 + [DOWN] * 40)), "head_down")
     assert len(events) == 1
     assert events[0].t_s == pytest.approx(1.0)
     assert events[0].reported_t_s - events[0].t_s == pytest.approx(1.0)
 
 
 def test_head_hysteresis_does_not_flicker():
-    pitches = [-30.0] * 40 + [-17.0, -30.0] * 10 + [0.0]
+    pitches = [DOWN] * 40 + [BETWEEN, DOWN] * 10 + [UP]
     events = run(head(pitches))
     assert len(kinds(events, "head_down")) == 1
     assert len(kinds(events, "head_up")) == 1

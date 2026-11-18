@@ -56,7 +56,9 @@ new `state`.
 Cached model outputs, rounded to 3 decimals; the expected outputs were computed from the rounded
 values. Per frame, `input` has `t_s`, `landmarks` (33 rows of `[x, y, visibility]`, all null
 when no person), `crop` `[x1, y1, x2, y2]` or null, and `crop_candidates` / `full_candidates`
-(`[x1, y1, x2, y2, confidence]`, full-frame pixels). Use `full_candidates` only on frames where
+(`[x1, y1, x2, y2, confidence]`, full-frame pixels), and `head_pitch_deg`: the Face Landmarker
+pitch, sampled at 10 Hz and held between samples, null when no face was found (the head-down
+thresholds in `config` are calibrated for it). Use `full_candidates` only on frames where
 `needs_full_frame` is true: the phone would not have run the full-frame detector otherwise.
 `expected` has `ball` (chosen detection), `ball_xy` (tracked position), `predicted`,
 `searched_full_frame`, `ran_full_frame`, `events` and `touch_rate`.
