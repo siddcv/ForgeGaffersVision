@@ -15,14 +15,14 @@ Ideas to explore:
 - Spatial / miss lost-control already lives in `src/metrics.py` (full-frame miss or ball far from feet for `lost_control_min_s`; crop-only misses do not count).
 - Touch detection by foot already lives in `src/metrics.py` (horizontal reversal near a foot).
 - New standalone frequency detector in `src/ball_loss.py`:
-  - Builds a baseline inter-touch interval after `ball_loss_baseline_s` of play.
-  - A gap is "late" once it exceeds `baseline_interval / (1 - ball_loss_drop_frac)` (and at least `ball_loss_dip_min_s`), up to `ball_loss_dip_max_s`.
-  - Emits `ball-loss` only when a late gap is followed by a return to near-baseline pace (recovery confirmation).
-  - Another late gap instead of recovery updates the baseline (pace change); speed-ups never count as a loss.
+  - Builds a baseline inter-touch interval after `ball_loss_baseline_s` of play: the median of the last `ball_loss_history_intervals` gaps, so one long gap cannot move it, a sustained slowdown raises it and faster play brings it back down.
+  - A gap is "late" once it exceeds `baseline_interval / (1 - ball_loss_drop_frac)` (and at least `ball_loss_dip_min_s`). No upper limit: any late gap can be a loss.
+  - Emits `ball-loss` only when a late gap is followed by a return to near-baseline pace (recovery confirmation). If late gaps come in a row, the newest one is judged.
+  - `ball_loss_pace_change_gaps` (3) late gaps in a row is a pace change, not a loss; speed-ups never count as a loss. Late gaps join the baseline history only once their run is resolved, and a gap confirmed as a loss never does.
   - Called once per touch: `step(state, touch_t_s, reported_t_s, cfg)`. Gaps use touch time; `reported_t_s` only stamps the event so latency is measurable.
   - Thresholds are `ball_loss_*` fields on `Config` in `src/config.py`.
   - Wired into `metrics.step` (`_step_rhythm`): each touch event is fed in, and a loss comes out as `lost_control` with `source="rhythm"` (spatial ones have `source="spatial"`). A spatial `lost_control` or `reset` calls `ball_loss.interrupt`, which drops the last touch and any pending loss but keeps the baseline, so one incident is reported once.
-- Synthetic coverage in `tests/test_ball_loss.py` (steady play, brief gap, sustained slowdown, speed-up, pre-baseline gap, 30/60 fps, uneven report delay, event timestamps, interrupt) and end-to-end in `tests/test_metrics.py` (long steady play, one late touch, ball escaping not double-reported), using `with_hold` / `with_ball_away` in `tests/synth.py`.
+- Synthetic coverage in `tests/test_ball_loss.py` (steady play, brief gap, long gap, sustained slowdown, three late gaps, slightly-late gap before a fumble, speed-up, baseline back down after speed-up, long gap in warmup, pre-baseline gap, 30/60 fps, uneven report delay, event timestamps, interrupt) and end-to-end in `tests/test_metrics.py` (long steady play, one late touch, ball escaping not double-reported), using `with_hold` / `with_ball_away` in `tests/synth.py`.
 
 # To-do
 - ~~Wire `ball_loss.step` into `metrics.step` (or `run_clip`) after each touch / frame, using real touch events.~~ Done (roadmap step 4).
@@ -55,8 +55,13 @@ Steps in order; the to-do items above map onto them.
 - ~~Combined touch rate for v1, or separate left/right rates with ~5% thresholds?~~ Combined (see step 3).
 - ~~Is one missed beat enough, or should a loss require a multi-touch gap?~~ One is enough for now (see step 3).
 - ~~Should frequency and spatial detectors both emit `lost_control`?~~ Yes, with a `source` field and de-dupe (see step 3).
-- Exact dip window (`dip_min_s` / `dip_max_s`) and `drop_frac` once real clips are available.
-- After a sustained slowdown, should the baseline always retarget to the new rate?
+- Exact `dip_min_s`, `drop_frac` and `pace_change_gaps` once real clips are available.
+- ~~After a sustained slowdown, should the baseline always retarget to the new rate?~~ It follows the median of recent gaps (bug fix from clip `20261102_135033`, where one long gap had switched the detector off).
+- Duplicate touches (0.1 s apart) pull the median baseline down, which can make normal gaps look late (e.g. `IMG_1707` at 9.85 s). Fix in touch detection rather than in `ball_loss.py`.
 
 # To look at later
 - **Pending loss at the end of the drill.** Ball loss is decided live, one frame at a time, in `metrics.step` (no post-recording pass). A rhythm loss is only confirmed by the touch after play resumes, so if recording stops while one is pending (late touch, no confirming touch yet) it is silently dropped. Decide whether an end-of-session "finish" step should report it, drop it, or flag it as unconfirmed.
+- **3+ same-foot touches in a row as a rhythm loss.** The tick-tock alternates feet, so a run of 3 or more touches on one foot breaks the drill even if the pace stays steady. Idea: report it as `lost_control` with `source="rhythm"` (or a new source, e.g. `"same_foot"`). Before building it:
+  - Fix touch detection first. On `20261101_184645`, some runs look like detector errors rather than play: one touch counted 2-3 times (e.g. right at 17.45 / 17.54 / 17.71 s; `touch_min_interval_s` is only 2 frames at 24 fps) and possible wrong-foot assignment (4 lefts in a row at 5.27-6.70 s). This rule would turn those errors into false losses.
+  - Decide the run length (3? 4?) and whether one repeat (2 in a row) stays allowed, as CLAUDE.md's drill definition says. Confirm with the client.
+  - Decide how it de-dupes with a pace-based rhythm loss over the same touches.
