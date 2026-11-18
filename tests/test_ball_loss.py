@@ -12,6 +12,7 @@ CFG = Config(
     ball_loss_drop_frac=0.3,
     ball_loss_dip_min_s=0.4,
     ball_loss_min_baseline_intervals=4,
+    ball_loss_pace_change_gaps=3,
 )
 
 
@@ -157,3 +158,21 @@ def test_baseline_comes_back_down_when_play_speeds_up():
     losses = [e for e in run(slow + fast + after) if e.kind == "ball-loss"]
     assert len(losses) == 1
     assert losses[0].value == pytest.approx(1.0)
+
+
+def test_slightly_late_gap_does_not_hide_the_fumble_after_it():
+    # Park clip at 19.8 s: a gap just over the late cut-off, then a real fumble, then normal pace.
+    # Two late gaps in a row are not yet a pace change; the newest one is judged.
+    before = steady_touches(5.0, interval_s=0.4)  # last touch 4.8, cut-off ~0.57 s
+    after = [5.4, 6.8, 7.2, 7.6, 8.0]  # 0.6 s (barely late), 1.4 s (fumble), then back to pace
+    losses = [e for e in run(before + after) if e.kind == "ball-loss"]
+    assert len(losses) == 1
+    assert losses[0].value == pytest.approx(1.4)
+    assert losses[0].t_s == pytest.approx(5.4)
+
+
+def test_three_late_gaps_in_a_row_is_a_pace_change_not_a_loss():
+    before = steady_touches(5.0)
+    slower = [5.8, 6.6, 7.4]  # three 0.8 s gaps (cut-off ~0.71 s)
+    after = [7.9, 8.4, 8.9]
+    assert run(before + slower + after) == []
