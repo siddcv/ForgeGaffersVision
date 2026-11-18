@@ -48,9 +48,13 @@ class Config:
     lost_control_min_s: float = 0.5
  
     # Head position
-    head_down_pitch_deg: float = -20.0
-    head_up_pitch_deg: float = -15.0
+    # Provisional calibration for 20261102_134245: cropped Face Landmarker samples
+    # in manually labelled head-down intervals were lower (~4.5-10.9 deg) than
+    # sampled upright intervals (~30-34 deg). Validate with diagnose_head_pose.
+    head_down_pitch_deg: float = 17.0
+    head_up_pitch_deg: float = 22.0
     head_down_min_s: float = 1.0
+    head_pose_sample_interval_s: float = 0.10  # Face Landmarker runs at 10 Hz
  
     # Ball detection
     ball_search_after_s: float = 0.15
