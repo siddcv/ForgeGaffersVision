@@ -9,9 +9,27 @@ exactly (see docs/PREPROCESSING.md). They match what Ultralytics does for a fixe
   4. keep the ball class above the confidence threshold, non-maximum suppression, map back
 A square foot crop is resized without padding, so the ball keeps the size foot_crop chose.
 """
+from pathlib import Path
+
 import numpy as np
 
 PAD_VALUE = 114
+
+
+def export_onnx(weights: str, imgsz: int) -> Path:
+    """models/<weights>_<imgsz>.onnx, exporting it with Ultralytics the first time (dev only)."""
+    target = Path("models") / f"{Path(weights).stem}_{imgsz}.onnx"
+    if not target.exists():
+        import shutil
+
+        from ultralytics import YOLO
+
+        exported = YOLO(weights).export(
+            format="onnx", imgsz=imgsz, dynamic=False, simplify=True, nms=False, verbose=False,
+        )
+        target.parent.mkdir(exist_ok=True)
+        shutil.move(exported, target)
+    return target
 
 
 def letterbox(bgr: np.ndarray, imgsz: int) -> tuple:

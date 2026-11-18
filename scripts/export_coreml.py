@@ -20,9 +20,8 @@ from pathlib import Path
 
 import numpy as np
 
-from scripts.bench_detector import export_onnx
 from src.config import Config
-from src.onnx_detector import OnnxBallDetector, decode, iou, letterbox, to_tensor
+from src.onnx_detector import OnnxBallDetector, decode, export_onnx, iou, letterbox, to_tensor
 
 SIZES = (320, 640)
 

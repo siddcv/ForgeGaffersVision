@@ -95,8 +95,10 @@ logic costs essentially nothing; the two neural networks are the whole budget.
        `metrics.py`), crossings not seen between contacts, the drill window, and the tick-tock delay.
 
 ### Phase 1: thin laptop live demo (a few days)
-- [ ] `src/live.py`: camera -> the shared per-frame function -> live overlay window; records the
-      raw video so live sessions can be labelled and replayed.
+- [x] `src/live.py`: camera -> the shared per-frame function -> live overlay window; records the
+      raw video and a timestamps sidecar so live sessions can be labelled and replayed. On the
+      laptop (1080p clip played live, 2 detector threads): ~71 ms per frame, ~78 ms feedback lag,
+      so ~14 fps processed; the newest frame is always taken and the rest are skipped.
 - [ ] Use the phone as a webcam (Camo, DroidCam or Iriun) placed low and in front, like the clips.
 - [ ] Goals: feel the tick-tock delay live and try camera placement for the alignment screen.
       Not performance.

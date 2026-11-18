@@ -10,7 +10,6 @@ Needs the clip's cache (run src.run_clip on it first).
 """
 import argparse
 import json
-import shutil
 import statistics
 import time
 from pathlib import Path
@@ -19,23 +18,10 @@ import numpy as np
 
 from src import ball as ball_module
 from src.config import Config
-from src.onnx_detector import OnnxBallDetector, iou, letterbox, to_tensor
+from src.onnx_detector import OnnxBallDetector, export_onnx, iou, letterbox, to_tensor
 from src.video_io import iter_frames
 
 SIZES = (320, 640)
-
-
-def export_onnx(weights: str, imgsz: int) -> Path:
-    target = Path("models") / f"{Path(weights).stem}_{imgsz}.onnx"
-    if not target.exists():
-        from ultralytics import YOLO
-
-        exported = YOLO(weights).export(
-            format="onnx", imgsz=imgsz, dynamic=False, simplify=True, nms=False, verbose=False,
-        )
-        target.parent.mkdir(exist_ok=True)
-        shutil.move(exported, target)
-    return target
 
 
 def load_inputs(clip: str, cache, cfg: Config, frames: int) -> list:

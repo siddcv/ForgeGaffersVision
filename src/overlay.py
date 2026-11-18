@@ -70,14 +70,58 @@ def _draw_flashes(image, last_reported: dict, t_s: float) -> None:
         cv2.putText(image, "contact", (300, 200), cv2.FONT_HERSHEY_SIMPLEX, 1.2, GRAY, 3)
 
 
+class Hud:
+    """What the overlay remembers between frames: running counts, flash times, head state."""
+
+    def __init__(self):
+        self.counts = {("touch", "left"): 0, ("touch", "right"): 0,
+                       ("contact", "left"): 0, ("contact", "right"): 0}
+        self.last_reported = {"touch": float("-inf"), "contact": float("-inf")}
+        self.head_down = False
+
+    def update(self, events, t_s: float) -> None:
+        for event in events:
+            if (event.kind, event.foot) in self.counts:
+                self.counts[(event.kind, event.foot)] += 1
+                self.last_reported[event.kind] = t_s
+        self.head_down = update_head_down(self.head_down, events)
+
+
+def draw(image, record: dict, landmarks, hud: Hud, cfg, t_s: float) -> None:
+    """Draw one frame's overlay in place. Call hud.update(record["events"], t_s) first."""
+    _draw_skeleton(image, landmarks, cfg.pose_min_visibility)
+    if record["crop"] is not None:
+        x1, y1, x2, y2 = map(int, record["crop"])
+        cv2.rectangle(image, (x1, y1), (x2, y2), (255, 255, 0), 1)
+    if record["ball"] is not None:
+        x1, y1, x2, y2 = map(int, record["ball"][:4])
+        cv2.rectangle(image, (x1, y1), (x2, y2), (0, 165, 255), 2)
+    elif record.get("predicted"):
+        # Tracker prediction through a short detection gap.
+        center = tuple(map(int, record["ball_xy"]))
+        cv2.circle(image, center, 25, (0, 165, 255), 2)
+        cv2.putText(image, "pred", (center[0] + 30, center[1]), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 165, 255), 2)
+    _draw_head(image, landmarks, hud.head_down, cfg)
+    _draw_flashes(image, hud.last_reported, t_s)
+    counts = hud.counts
+    mode = "SEARCH" if record["searched_full_frame"] else "TRACK"
+    cv2.putText(
+        image, f"{mode}  tick-tock L:{counts['touch', 'left']} R:{counts['touch', 'right']}"
+        f"  t={t_s:.2f}s", (20, 40), cv2.FONT_HERSHEY_SIMPLEX, 1.0, WHITE, 2,
+    )
+    cv2.putText(
+        image, f"contacts L:{counts['contact', 'left']} R:{counts['contact', 'right']}", (20, 160),
+        cv2.FONT_HERSHEY_SIMPLEX, 1.0, GRAY, 2,
+    )
+    _draw_touch_rate(image, record.get("touch_rate"), cfg.touches_per_minute_goal)
+
+
 def render(clip_path: str, out_path: str, records: list, landmarks, cfg) -> None:
     by_index = {record["index"]: record for record in records}
     times = np.array([record["t_s"] for record in records])
     fps = 1.0 / float(np.median(np.diff(times))) if len(times) > 1 else 30.0
     writer = None
-    counts = {("touch", "left"): 0, ("touch", "right"): 0, ("contact", "left"): 0, ("contact", "right"): 0}
-    last_reported = {"touch": float("-inf"), "contact": float("-inf")}
-    head_down = False
+    hud = Hud()
     try:
         for frame in iter_frames(clip_path):
             record = by_index.get(frame.index)
@@ -89,35 +133,8 @@ def render(clip_path: str, out_path: str, records: list, landmarks, cfg) -> None
                 writer = cv2.VideoWriter(
                     out_path, cv2.VideoWriter_fourcc(*"mp4v"), fps, (width, height),
                 )
-            _draw_skeleton(image, landmarks[frame.index], cfg.pose_min_visibility)
-            if record["crop"] is not None:
-                x1, y1, x2, y2 = map(int, record["crop"])
-                cv2.rectangle(image, (x1, y1), (x2, y2), (255, 255, 0), 1)
-            if record["ball"] is not None:
-                x1, y1, x2, y2 = map(int, record["ball"][:4])
-                cv2.rectangle(image, (x1, y1), (x2, y2), (0, 165, 255), 2)
-            elif record.get("predicted"):
-                # Tracker prediction through a short detection gap.
-                center = tuple(map(int, record["ball_xy"]))
-                cv2.circle(image, center, 25, (0, 165, 255), 2)
-                cv2.putText(image, "pred", (center[0] + 30, center[1]), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 165, 255), 2)
-            for event in record["events"]:
-                if (event.kind, event.foot) in counts:
-                    counts[(event.kind, event.foot)] += 1
-                    last_reported[event.kind] = frame.t_s
-            head_down = update_head_down(head_down, record["events"])
-            _draw_head(image, landmarks[frame.index], head_down, cfg)
-            _draw_flashes(image, last_reported, frame.t_s)
-            mode = "SEARCH" if record["searched_full_frame"] else "TRACK"
-            cv2.putText(
-                image, f"{mode}  tick-tock L:{counts['touch', 'left']} R:{counts['touch', 'right']}"
-                f"  t={frame.t_s:.2f}s", (20, 40), cv2.FONT_HERSHEY_SIMPLEX, 1.0, WHITE, 2,
-            )
-            cv2.putText(
-                image, f"contacts L:{counts['contact', 'left']} R:{counts['contact', 'right']}", (20, 160),
-                cv2.FONT_HERSHEY_SIMPLEX, 1.0, GRAY, 2,
-            )
-            _draw_touch_rate(image, record.get("touch_rate"), cfg.touches_per_minute_goal)
+            hud.update(record["events"], frame.t_s)
+            draw(image, record, landmarks[frame.index], hud, cfg, frame.t_s)
             writer.write(image)
     finally:
         if writer is not None:
