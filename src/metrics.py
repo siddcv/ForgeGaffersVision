@@ -69,6 +69,15 @@ def foot_distance(ball_xy: tuple, foot: tuple) -> float | None:
     return min(math.dist(ball_xy, point) for point in foot)
 
 
+def count_lost_control(events) -> dict:
+    """Number of lost_control events from each detector."""
+    counts = {"spatial": 0, "rhythm": 0}
+    for event in events:
+        if event.kind == "lost_control" and event.source in counts:
+            counts[event.source] += 1
+    return counts
+
+
 def nearer_foot(distances: tuple) -> tuple:
     """Return (foot name, distance) for the closer foot, or (None, None)."""
     left, right = distances

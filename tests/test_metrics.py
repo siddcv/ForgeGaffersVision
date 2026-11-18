@@ -3,7 +3,7 @@ from dataclasses import replace
 import pytest
 
 from src.config import Config
-from src.metrics import Observation, initial_state, step
+from src.metrics import Event, Observation, count_lost_control, initial_state, step
 from tests.synth import (
     DIAMETER_PX, LEFT_FOOT, RIGHT_FOOT, Y, synth_tick_tock, with_ball_away, with_hold,
 )
@@ -148,6 +148,18 @@ def test_one_late_touch_then_normal_pace_is_rhythm_lost_control():
     assert [e.source for e in lost] == ["rhythm"]
     assert lost[0].t_s < 7.0 < lost[0].t_s + lost[0].value
     assert lost[0].reported_t_s > lost[0].t_s + lost[0].value  # confirmed by the next touch
+
+
+def test_count_lost_control_splits_by_source():
+    events = [
+        Event("lost_control", 1.0, 1.5, source="spatial"),
+        Event("touch", 2.0, 2.1, foot="left"),
+        Event("lost_control", 3.0, 4.0, value=1.0, source="rhythm"),
+        Event("lost_control", 5.0, 5.5, source="spatial"),
+        Event("reset", 6.0, 6.0),
+    ]
+    assert count_lost_control(events) == {"spatial": 2, "rhythm": 1}
+    assert count_lost_control([]) == {"spatial": 0, "rhythm": 0}
 
 
 def test_spatial_loss_is_not_also_reported_as_rhythm_loss():

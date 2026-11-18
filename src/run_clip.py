@@ -165,6 +165,7 @@ def summarize(records: list, cache, cfg: Config) -> dict:
             foot: float(np.mean(values)) if values else None for foot, values in speeds.items()
         },
         "lost_control": sum(e.kind == "lost_control" for e in events),
+        "lost_control_by_source": metrics.count_lost_control(events),
         "resets": sum(e.kind == "reset" for e in events),
         "head_down": sum(e.kind == "head_down" for e in events),
         "mean_touch_latency_ms": float(np.mean(latencies) * 1000) if latencies else None,

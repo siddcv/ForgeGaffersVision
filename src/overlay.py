@@ -2,11 +2,13 @@
 import cv2
 import numpy as np
 
+from .metrics import count_lost_control
 from .pose import SKELETON, coarse_head_pitch_deg, head_box
 from .video_io import iter_frames
 
 RED = (0, 0, 255)
 WHITE = (255, 255, 255)
+LOST_BANNER_S = 1.0  # how long the debug video shows a lost-control banner; display only
 
 
 def update_head_down(head_down: bool, events) -> bool:
@@ -17,6 +19,21 @@ def update_head_down(head_down: bool, events) -> bool:
         elif event.kind == "head_up":
             head_down = False
     return head_down
+
+
+def latest_lost_control(previous, events):
+    """The most recently reported lost_control event, given this frame's events."""
+    for event in events:
+        if event.kind == "lost_control":
+            previous = event
+    return previous
+
+
+def lost_banner(event, t_s: float) -> str | None:
+    """Banner text from the moment a loss was reported, for LOST_BANNER_S."""
+    if event is None or not 0.0 <= t_s - event.reported_t_s < LOST_BANNER_S:
+        return None
+    return f"LOST CONTROL ({event.source})"
 
 
 def _draw_head(image, landmarks, head_down, cfg):
@@ -47,6 +64,8 @@ def render(clip_path: str, out_path: str, records: list, landmarks, cfg) -> None
     fps = 1.0 / float(np.median(np.diff(times))) if len(times) > 1 else 30.0
     writer = None
     left = right = 0
+    lost = {"spatial": 0, "rhythm": 0}
+    last_lost = None
     head_down = False
     try:
         for frame in iter_frames(clip_path):
@@ -75,11 +94,17 @@ def render(clip_path: str, out_path: str, records: list, landmarks, cfg) -> None
                 if event.kind == "touch":
                     left += event.foot == "left"
                     right += event.foot == "right"
+            for source, n in count_lost_control(record["events"]).items():
+                lost[source] += n
+            last_lost = latest_lost_control(last_lost, record["events"])
+            banner = lost_banner(last_lost, frame.t_s)
+            if banner:
+                cv2.putText(image, banner, (20, 120), cv2.FONT_HERSHEY_SIMPLEX, 1.0, RED, 2)
             head_down = update_head_down(head_down, record["events"])
             _draw_head(image, landmarks[frame.index], head_down, cfg)
             mode = "SEARCH" if record["searched_full_frame"] else "TRACK"
             cv2.putText(
-                image, f"{mode}  L:{left} R:{right}  t={frame.t_s:.2f}s", (20, 40),
+                image, f"{mode}  L:{left} R:{right}  lost sp:{lost['spatial']} rh:{lost['rhythm']}  t={frame.t_s:.2f}s", (20, 40),
                 cv2.FONT_HERSHEY_SIMPLEX, 1.0, (255, 255, 255), 2,
             )
             writer.write(image)

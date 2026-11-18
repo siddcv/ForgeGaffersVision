@@ -1,7 +1,7 @@
 import numpy as np
 
 from src.metrics import Event
-from src.overlay import update_head_down
+from src.overlay import LOST_BANNER_S, latest_lost_control, lost_banner, update_head_down
 from src.pose import SKELETON, coarse_head_pitch_deg, head_box
 
 
@@ -34,3 +34,21 @@ def test_head_down_label_follows_events():
     assert update_head_down(False, [down]) is True
     assert update_head_down(True, []) is True
     assert update_head_down(True, [up]) is False
+
+
+def test_latest_lost_control_keeps_the_newest_report():
+    first = Event("lost_control", 1.0, 1.5, source="spatial")
+    second = Event("lost_control", 3.0, 4.0, source="rhythm")
+    assert latest_lost_control(None, [Event("touch", 0.5, 0.6)]) is None
+    assert latest_lost_control(None, [first]) == first
+    assert latest_lost_control(first, []) == first
+    assert latest_lost_control(first, [second]) == second
+
+
+def test_lost_banner_shows_from_report_for_a_while():
+    event = Event("lost_control", 3.0, 4.0, source="rhythm")
+    assert lost_banner(None, 4.0) is None
+    assert lost_banner(event, 3.9) is None  # not known yet: show it when it was reported
+    assert lost_banner(event, 4.0) == "LOST CONTROL (rhythm)"
+    assert lost_banner(event, 4.0 + LOST_BANNER_S - 0.01) == "LOST CONTROL (rhythm)"
+    assert lost_banner(event, 4.0 + LOST_BANNER_S) is None

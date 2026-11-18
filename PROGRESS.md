@@ -45,7 +45,7 @@ Steps in order; the to-do items above map onto them.
   - **Decided - strictness:** keep `drop_frac=0.3` as is. An uneven touch is the wrong rhythm and should be flagged, even if that also flags some touches the touch detector failed to see.
     - *Revisit later:* if false losses from undetected touches show up on real clips (step 8), go easier on the player and stricter on the software: require a larger gap (~2.5x baseline) or a ball-position cue (ball moved away from the feet) before reporting.
 - [x] **4. Wire into `metrics.step`.** Nest the ball-loss state in `metrics.State`, feed it touch events from `_step_ball`, apply the de-dupe rule. Integration tests in `test_metrics.py` with `tests/synth.py`: steady -> none, one long gap -> one loss, spatial loss -> no duplicate.
-- [ ] **5. Surface in `run_clip`.** Count the new events in `summarize()` / `report.json`; optional overlay marker.
+- [x] **5. Surface in `run_clip`.** `report.json` summary keeps `lost_control` (total) and adds `lost_control_by_source` (`spatial` / `rhythm`), via `metrics.count_lost_control`. The overlay shows `lost sp:N rh:N` in the top line and a red `LOST CONTROL (<source>)` banner for `LOST_BANNER_S` (1 s) from the frame the loss was reported.
 - [ ] **6. Ground truth.** Get the two manifest clips into `data/clips/`; label touches and `lost_control` for at least `20261101_183403` (likely loss ~8.2-10.6 s). Record `lost-in-frame`, `lost-out-of-frame`, `slow-fast`, `repeat-touches` takes.
 - [ ] **7. Evaluation script.** Small `evaluate.py` matching predicted events to labels within a time tolerance: precision, recall, latency. Also serves touch metrics.
 - [ ] **8. Tune and decide.** Tune `drop_frac`, dip window, `baseline_s` on train clips, check on test clips. Measure missed-touch false losses; add per-foot baselines only if justified.
@@ -57,3 +57,6 @@ Steps in order; the to-do items above map onto them.
 - ~~Should frequency and spatial detectors both emit `lost_control`?~~ Yes, with a `source` field and de-dupe (see step 3).
 - Exact dip window (`dip_min_s` / `dip_max_s`) and `drop_frac` once real clips are available.
 - After a sustained slowdown, should the baseline always retarget to the new rate?
+
+# To look at later
+- **Pending loss at the end of the drill.** Ball loss is decided live, one frame at a time, in `metrics.step` (no post-recording pass). A rhythm loss is only confirmed by the touch after play resumes, so if recording stops while one is pending (late touch, no confirming touch yet) it is silently dropped. Decide whether an end-of-session "finish" step should report it, drop it, or flag it as unconfirmed.
