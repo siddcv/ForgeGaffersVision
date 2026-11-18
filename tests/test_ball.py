@@ -2,7 +2,8 @@ import numpy as np
 import pytest
 
 from src.ball import (
-    BallTracker, SearchState, box_center, box_diameter_px, crop_image, foot_crop, search_step,
+    BallTracker, SearchState, box_center, box_diameter_px, crop_image, foot_crop, needs_full_frame,
+    search_step,
     to_full_frame,
 )
 from src.config import Config
@@ -147,3 +148,22 @@ def test_tracker_reacquires_after_a_long_absence():
     t = tracked(tracker, [300 + 5 * i for i in range(20)])
     later = t + CFG.track_gate_max_s + 0.1
     assert tracker.choose(later, [ball(900)]) is not None
+
+
+@pytest.mark.parametrize("state", [
+    SearchState(),
+    SearchState(crop_miss_since_s=0.0),
+    SearchState(searching=True, crop_miss_since_s=0.0),
+])
+@pytest.mark.parametrize("t_s", [0.0, CFG.ball_search_after_s / 2, CFG.ball_search_after_s])
+@pytest.mark.parametrize("crop", [CROP, None])
+@pytest.mark.parametrize("crop_det", [IN_CROP, None])
+def test_needs_full_frame_is_false_only_when_search_step_ignores_full_det(state, t_s, crop, crop_det):
+    # Live code skips the full-frame detector when needs_full_frame is false, so search_step must
+    # then give the same answer whatever the full frame would have found.
+    with_far = search_step(state, t_s, crop, crop_det, FAR, CFG)
+    with_none = search_step(state, t_s, crop, crop_det, None, CFG)
+    if not needs_full_frame(state, t_s, crop, crop_det, CFG):
+        assert with_far == with_none
+    else:
+        assert with_far != with_none

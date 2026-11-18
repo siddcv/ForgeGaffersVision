@@ -11,10 +11,9 @@ import cv2
 import numpy as np
 
 from . import ball as ball_module
-from . import metrics
 from .config import Config
-from .filters import OneEuroFilter
-from .pose import LEFT_FOOT, RIGHT_FOOT, PoseEstimator, coarse_head_pitch_deg, visible_points
+from .pipeline import FramePipeline
+from .pose import LEFT_FOOT, RIGHT_FOOT, PoseEstimator, visible_points
 from .video_io import iter_frames, read_timestamps
 
 
@@ -76,64 +75,21 @@ def build_cache(clip_path: str, cache_path: Path, cfg: Config) -> None:
 
 def replay(cache, cfg: Config, stride: int = 1) -> list:
     """Feed cached model outputs through the same per-frame logic the phone will run."""
-    search = ball_module.SearchState()
-    tracker = ball_module.BallTracker(cfg)
-    state = metrics.initial_state()
+    pipeline = FramePipeline(cfg)
     crop_balls, full_balls = cache["crop_balls"], cache["full_balls"]
     if crop_balls.ndim == 2:  # caches written before candidates were kept
         crop_balls, full_balls = crop_balls[:, None, :], full_balls[:, None, :]
-    euro = {}
     records = []
-
-    def smooth_points(indices, points_at, t_s):
-        smoothed = []
-        for index in indices:
-            # Written as "not >=" so a frame with no pose (NaN) is skipped too: one NaN fed to a
-            # One Euro filter stays in its state and turns every later foot position into NaN.
-            if not points_at[index, 2] >= cfg.pose_min_visibility:
-                continue
-            xy = []
-            for axis in (0, 1):
-                key = (index, axis)
-                if key not in euro:
-                    euro[key] = OneEuroFilter(
-                        cfg.one_euro_min_cutoff, cfg.one_euro_beta, cfg.one_euro_d_cutoff,
-                    )
-                xy.append(euro[key].update(t_s, float(points_at[index, axis])))
-            smoothed.append(tuple(xy))
-        return tuple(smoothed)
-
     for i in range(0, len(cache["t_s"]), stride):
-        t_s = float(cache["t_s"][i])
         crop_row = cache["crops"][i]
-        crop = None if np.isnan(crop_row[0]) else tuple(crop_row)
-        left_foot = smooth_points(LEFT_FOOT, cache["landmarks"][i], t_s)
-        right_foot = smooth_points(RIGHT_FOOT, cache["landmarks"][i], t_s)
-        feet = left_foot + right_foot
-        search, detection, searched = ball_module.search_step(
-            search, t_s, crop,
-            tracker.choose(t_s, _from_rows(crop_balls[i]), feet),
-            tracker.choose(t_s, _from_rows(full_balls[i]), feet),
-            cfg,
+        record = pipeline.step(
+            t_s=float(cache["t_s"][i]),
+            landmarks=cache["landmarks"][i],
+            crop=None if np.isnan(crop_row[0]) else tuple(crop_row),
+            crop_candidates=_from_rows(crop_balls[i]),
+            full_candidates=_from_rows(full_balls[i]),
         )
-        ball_xy, predicted = tracker.update(t_s, detection, searched)
-        observation = metrics.Observation(
-            t_s=t_s,
-            # Metrics see detections only: on a real clip, snapping from a prediction back to the
-            # next detection looks like a direction change and adds false touches.
-            ball_xy=None if predicted else ball_xy,
-            ball_diameter_px=ball_module.box_diameter_px(detection) if detection else None,
-            searched_full_frame=searched,
-            left_foot=left_foot,
-            right_foot=right_foot,
-            head_pitch_deg=coarse_head_pitch_deg(cache["landmarks"][i], cfg.pose_min_visibility),
-        )
-        state, events = metrics.step(state, observation, cfg)
-        records.append({
-            "index": i, "t_s": t_s, "crop": crop, "ball": detection, "ball_xy": ball_xy,
-            "predicted": predicted, "searched_full_frame": searched, "events": events,
-            "touch_rate": metrics.touch_rate(state, t_s, cfg),
-        })
+        records.append({"index": i, **record})
     return records
 
 

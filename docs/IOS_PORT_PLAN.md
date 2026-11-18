@@ -38,6 +38,20 @@ Measured on the laptop CPU (PyTorch, 1080p frames, IMG_1710, noisy machine):
 | YOLOv8n full frame @640 (only while searching, ~16% of frames) | 97-134 ms |
 | All plain-code logic (filters, search switch, tracker, `metrics.step`) | 0.1-0.2 ms |
 
+The same untuned YOLOv8n exported to a fixed-size ONNX model, run in ONNX Runtime on the laptop CPU
+(`python -m scripts.bench_detector`, IMG_1710, 300 real foot crops). No retraining or other
+optimization was needed; the export alone gives the same detections as PyTorch (242 of 242 shared
+detections with IoU 1.0, 2 extra borderline ones at the 0.15 confidence threshold):
+
+| Stage | 1 thread | 2 threads | 4 threads |
+|---|---|---|---|
+| Crop preprocessing (crop, resize, RGB, normalize) | 3.5 ms | | |
+| Foot crop @320, model only | 40 ms | 25 ms | 21 ms |
+| Full frame @640, model only (searching, ~7% of frames) | 162 ms | 101 ms | 81 ms |
+
+Model file: 12.7 MB at 32-bit, about half that at 16-bit. On the Mac, `python -m scripts.export_coreml`
+writes the `.mlpackage` files and checks them against ONNX.
+
 Expected on an iPhone 12 or newer. These are estimates from published benchmarks for these model
 families, **not yet measured on our models**:
 
@@ -67,21 +81,24 @@ logic costs essentially nothing; the two neural networks are the whole budget.
 ## Phases
 
 ### Phase 0: now, on Windows (no Mac)
-1. [ ] **One shared per-frame function.** Move the per-frame body of `replay()` in `run_clip.py`
-       into one function used by replay and live, and mirrored later in Swift.
-2. [ ] **Preprocessing spec** (`docs/PREPROCESSING.md`): input sizes, crop rules, padding, channel
+1. [x] **One shared per-frame function.** `FramePipeline.step` in `src/pipeline.py`, used by replay
+       and (next) live, and mirrored later in Swift. Full-frame candidates are requested only when
+       `ball.needs_full_frame` says so (6.7% of frames across the cached clips).
+2. [x] **Preprocessing spec** (`docs/PREPROCESSING.md`): input sizes, crop rules, padding, channel
        order, normalization. The Swift version must match it exactly.
 3. [ ] **Detector choice:** check the licence, and convert each candidate to Core ML in WSL
        (`coremltools` does not run natively on Windows; conversion works in WSL, running and profiling
        need a Mac). Then run the fine-tuning pilot in `FINE_TUNING.md`.
-4. [ ] **Portable test vectors:** export the `tests/test_metrics.py` cases as JSON (input frames,
-       expected events) so the Swift port passes the same answers.
+4. [x] **Portable test vectors** (`tests/vectors/`, see its README): 25 metric scenarios, the
+       filters, the search switch, and 10 s of a real clip through `FramePipeline.step`.
 5. [ ] **Fix the rule gaps while they are cheap in Python:** starting from rest (TODO in
        `metrics.py`), crossings not seen between contacts, the drill window, and the tick-tock delay.
 
 ### Phase 1: thin laptop live demo (a few days)
-- [ ] `src/live.py`: camera -> the shared per-frame function -> live overlay window; records the
-      raw video so live sessions can be labelled and replayed.
+- [x] `src/live.py`: camera -> the shared per-frame function -> live overlay window; records the
+      raw video and a timestamps sidecar so live sessions can be labelled and replayed. On the
+      laptop (1080p clip played live, 2 detector threads): ~71 ms per frame, ~78 ms feedback lag,
+      so ~14 fps processed; the newest frame is always taken and the rest are skipped.
 - [ ] Use the phone as a webcam (Camo, DroidCam or Iriun) placed low and in front, like the clips.
 - [ ] Goals: feel the tick-tock delay live and try camera placement for the alignment screen.
       Not performance.
