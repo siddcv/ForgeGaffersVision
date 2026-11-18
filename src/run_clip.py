@@ -12,9 +12,9 @@ import numpy as np
 
 from . import ball as ball_module
 from .config import Config
-from .face_pose import FacePoseEstimator
+from .face_pose import open_head_pitch_sampler
 from .pipeline import POSE_PITCH, FramePipeline
-from .pose import LEFT_FOOT, RIGHT_FOOT, PoseEstimator, head_box, visible_points
+from .pose import LEFT_FOOT, RIGHT_FOOT, PoseEstimator, visible_points
 from .video_io import iter_frames, read_timestamps
 
 
@@ -35,18 +35,11 @@ def build_cache(clip_path: str, cache_path: Path, cfg: Config) -> None:
     tracker's diameter plays that role; changing crop settings needs --refresh.
     """
     pose = PoseEstimator()
-    try:
-        face_pose = FacePoseEstimator()
-        print("  Face Landmarker enabled (10 Hz head-pose sampling)")
-    except Exception as exc:
-        face_pose = None
-        print(f"  WARNING: Face Landmarker unavailable; using pose-only fallback: {exc}")
+    head_sampler, face_pose = open_head_pitch_sampler(cfg)
     detector = ball_module.YoloBallDetector(cfg)
     k = cfg.ball_candidates
     times, landmarks, head_pitch, crops, crop_balls, full_balls = [], [], [], [], [], []
     last_ms = -1
-    next_face_sample_s = 0.0
-    latest_face_pitch = None
     diameter = None
     try:
         for frame in iter_frames(clip_path):
@@ -55,27 +48,8 @@ def build_cache(clip_path: str, cache_path: Path, cfg: Config) -> None:
             last_ms = t_ms
             rgb = cv2.cvtColor(frame.bgr, cv2.COLOR_BGR2RGB)
             points = pose.detect(rgb, t_ms)
-            if face_pose is not None and frame.t_s + 1e-9 >= next_face_sample_s:
-                # Pose already localizes the player's head reliably. Face Landmarker
-                # misses the small face in the full portrait frame, so crop around
-                # the pose head box, make it square, and enlarge it before inference.
-                box = head_box(points, cfg.pose_min_visibility, cfg.head_box_padding)
-                latest_face_pitch = None
-                if box is not None:
-                    x1, y1, x2, y2 = box
-                    center_x, center_y = (x1 + x2) / 2, (y1 + y2) / 2
-                    side = max(x2 - x1, y2 - y1) * 1.5
-                    crop_x1 = max(0, int(center_x - side / 2))
-                    crop_y1 = max(0, int(center_y - side / 2))
-                    crop_x2 = min(width, int(center_x + side / 2))
-                    crop_y2 = min(height, int(center_y + side / 2))
-                    head_crop = frame.bgr[crop_y1:crop_y2, crop_x1:crop_x2]
-                    if head_crop.size:
-                        enlarged = cv2.resize(head_crop, (256, 256), interpolation=cv2.INTER_LINEAR)
-                        face_rgb = cv2.cvtColor(enlarged, cv2.COLOR_BGR2RGB)
-                        latest_face_pitch = face_pose.detect(face_rgb, t_ms)
-                next_face_sample_s = frame.t_s + cfg.head_pose_sample_interval_s
-            head_pitch.append(np.nan if latest_face_pitch is None else latest_face_pitch)
+            pitch = head_sampler.update(frame.bgr, points, frame.t_s, t_ms) if head_sampler else None
+            head_pitch.append(np.nan if pitch is None else pitch)
             feet = visible_points(points, LEFT_FOOT + RIGHT_FOOT, cfg.pose_min_visibility)
             crop = ball_module.foot_crop(feet, width, height, cfg, diameter)
             crop_dets = []
