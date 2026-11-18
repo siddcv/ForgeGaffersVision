@@ -20,12 +20,13 @@ from src.config import Config
 from src.filters import Kalman1D, OneEuroFilter
 from src.pipeline import FramePipeline
 from tests.synth import (
-    DIAMETER_PX, LEFT_FOOT, RIGHT_FOOT, Y, ball_at, head, missing, path, synth_tick_tock,
+    DIAMETER_PX, LEFT_FOOT, RIGHT_FOOT, Y, ball_at, head, head_levels, missing, path, synth_tick_tock,
 )
 
 OUT = Path("tests/vectors")
 FORMAT_VERSION = 1
 CFG = Config()
+UP, DOWN, BETWEEN = head_levels(CFG)  # pitches placed relative to the head thresholds
 
 PIPELINE_CLIP = "IMG_1710"
 PIPELINE_START_FRAME = 60  # 1.0 s in: tick-tocks, full-frame searching, a lost control and reset
@@ -166,11 +167,11 @@ def metrics_scenarios() -> dict:
                                      missing(60, searched=True), CFG),
         "far_ball_then_reset": ("ball far from the feet for 1 s, then back: lost control and reset",
                                 ball_at(1000.0, 30) + ball_at(240.0, 3, start=1.0), CFG),
-        "head_down_under_1s": ("head down for 30 frames at 30 fps: not reported", head([-30.0] * 30), CFG),
+        "head_down_under_1s": ("head down for 30 frames at 30 fps: not reported", head([DOWN] * 30), CFG),
         "head_down_over_1s": ("head up 1 s then down: head_down stamped at 1.0 s",
-                              head([0.0] * 30 + [-30.0] * 40), CFG),
+                              head([UP] * 30 + [DOWN] * 40), CFG),
         "head_hysteresis": ("pitch flickering between the two thresholds: one down, one up",
-                            head([-30.0] * 40 + [-17.0, -30.0] * 10 + [0.0]), CFG),
+                            head([DOWN] * 40 + [BETWEEN, DOWN] * 10 + [UP]), CFG),
     }
 
 
@@ -240,6 +241,9 @@ def search_vectors() -> dict:
 
 def pipeline_vector() -> dict:
     cache = dict(np.load(Path("cache") / f"{PIPELINE_CLIP}.npz"))
+    if "head_pitch_deg" not in cache:
+        raise SystemExit(f"cache/{PIPELINE_CLIP}.npz has no Face Landmarker pitch: rebuild it with "
+                         "python -m src.run_clip <clip> --refresh --no-overlay")
     end = PIPELINE_START_FRAME + PIPELINE_FRAMES * PIPELINE_STRIDE
     pipeline = FramePipeline(CFG)
     frames = []
@@ -250,10 +254,13 @@ def pipeline_vector() -> dict:
         crop_candidates = [tuple(round(float(v), ROUND) for v in row) for row in cache["crop_balls"][i] if not np.isnan(row[0])]
         full_candidates = [tuple(round(float(v), ROUND) for v in row) for row in cache["full_balls"][i] if not np.isnan(row[0])]
         t_s = round(float(cache["t_s"][i]), 6)
-        record = pipeline.step(t_s, landmarks, crop, crop_candidates, full_candidates)
+        pitch = cache["head_pitch_deg"][i]
+        head_pitch = round(float(pitch), ROUND) if np.isfinite(pitch) else None
+        record = pipeline.step(t_s, landmarks, crop, crop_candidates, full_candidates, head_pitch)
         frames.append({
             "input": {"t_s": t_s, "landmarks": landmarks, "crop": crop,
-                      "crop_candidates": crop_candidates, "full_candidates": full_candidates},
+                      "crop_candidates": crop_candidates, "full_candidates": full_candidates,
+                      "head_pitch_deg": head_pitch},
             "expected": {k: record[k] for k in ("ball", "ball_xy", "predicted", "searched_full_frame",
                                                  "ran_full_frame", "events", "touch_rate")},
         })
@@ -262,7 +269,8 @@ def pipeline_vector() -> dict:
                         f"{PIPELINE_START_FRAME}, every {PIPELINE_STRIDE}nd frame (30 fps), fresh state. "
                         "landmarks are 33 x (pixel x, pixel y, visibility), null when no person was found. "
                         "Candidates are (x1, y1, x2, y2, confidence) in full-frame pixels; full_candidates "
-                        "must only be used on frames where needs_full_frame is true."),
+                        "must only be used on frames where needs_full_frame is true. head_pitch_deg is "
+                        "the Face Landmarker pitch (sampled at 10 Hz and held), null when no face was found."),
         "config": config_dict(CFG),
         "frames": frames,
     }
