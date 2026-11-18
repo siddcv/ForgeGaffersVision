@@ -1,0 +1,82 @@
+{
+ "format_version": 1,
+ "description": "ball.search_step with ball.needs_full_frame; full_det is only read when needed",
+ "config": {
+  "ball_size": 5,
+  "ball_diameter_override_m": null,
+  "diameter_smoothing": 0.2,
+  "touch_min_speed_mps": 0.2,
+  "touch_min_travel_diam": 0.1,
+  "touch_foot_distance_diam": 1.5,
+  "touch_foot_rule": "direction",
+  "touch_min_interval_s": 0.08,
+  "ticktock_max_arrival_s": 1.0,
+  "touch_max_gap_s": 0.25,
+  "speed_window_s": 0.1,
+  "touches_per_minute_goal": 150,
+  "touch_minute_s": 60.0,
+  "touch_pace_window_s": 10.0,
+  "touch_pace_min_s": 3.0,
+  "lost_distance_diam": 1.5,
+  "lost_control_min_s": 0.5,
+  "head_down_pitch_deg": 17.0,
+  "head_up_pitch_deg": 22.0,
+  "head_down_min_s": 1.0,
+  "head_pose_sample_interval_s": 0.1,
+  "ball_search_after_s": 0.15,
+  "ball_confidence": 0.15,
+  "ball_class_id": 32,
+  "ball_candidates": 3,
+  "ball_nms_iou": 0.7,
+  "detector_weights": "yolov8n.pt",
+  "crop_imgsz": 320,
+  "full_imgsz": 640,
+  "crop_ball_frac": 0.18,
+  "crop_span_min_scale": 1.2,
+  "crop_span_scale": 2.0,
+  "crop_min_frac": 0.25,
+  "crop_pad_value": 114,
+  "track_gate_diam": 2.5,
+  "track_gate_max_s": 0.3,
+  "track_max_predict_s": 0.1,
+  "eval_touch_tolerance_s": 0.2,
+  "eval_event_tolerance_s": 0.5,
+  "pose_min_visibility": 0.5,
+  "head_box_padding": 0.5,
+  "kalman_process_noise": 4000000.0,
+  "kalman_measurement_noise": 4.0,
+  "one_euro_min_cutoff": 1.5,
+  "one_euro_beta": 0.02,
+  "one_euro_d_cutoff": 1.0,
+  "ball_diameter_m": 0.22
+ },
+ "sequences": {
+  "found_in_crop": [
+   {"t_s":0.0,"crop":[100,100,300,300],"crop_det":[190,190,210,210,0.9],"full_det":[800,100,820,120,0.9],"expected":{"needs_full_frame":false,"detection":[190,190,210,210,0.9],"searched_full_frame":false,"state":{"searching":false,"crop_miss_since_s":null}}}
+  ],
+  "brief_crop_miss": [
+   {"t_s":0.0,"crop":[100,100,300,300],"crop_det":[190,190,210,210,0.9],"full_det":[800,100,820,120,0.9],"expected":{"needs_full_frame":false,"detection":[190,190,210,210,0.9],"searched_full_frame":false,"state":{"searching":false,"crop_miss_since_s":null}}},
+   {"t_s":0.03,"crop":[100,100,300,300],"crop_det":null,"full_det":[800,100,820,120,0.9],"expected":{"needs_full_frame":false,"detection":null,"searched_full_frame":false,"state":{"searching":false,"crop_miss_since_s":0.03}}},
+   {"t_s":0.06,"crop":[100,100,300,300],"crop_det":[190,190,210,210,0.9],"full_det":[800,100,820,120,0.9],"expected":{"needs_full_frame":false,"detection":[190,190,210,210,0.9],"searched_full_frame":false,"state":{"searching":false,"crop_miss_since_s":null}}}
+  ],
+  "search_after_misses_finds_far_ball": [
+   {"t_s":0.0,"crop":[100,100,300,300],"crop_det":null,"full_det":[800,100,820,120,0.9],"expected":{"needs_full_frame":false,"detection":null,"searched_full_frame":false,"state":{"searching":false,"crop_miss_since_s":0.0}}},
+   {"t_s":0.15,"crop":[100,100,300,300],"crop_det":null,"full_det":[800,100,820,120,0.9],"expected":{"needs_full_frame":true,"detection":[800,100,820,120,0.9],"searched_full_frame":true,"state":{"searching":true,"crop_miss_since_s":0.0}}},
+   {"t_s":0.18,"crop":[100,100,300,300],"crop_det":null,"full_det":[800,100,820,120,0.9],"expected":{"needs_full_frame":true,"detection":[800,100,820,120,0.9],"searched_full_frame":true,"state":{"searching":true,"crop_miss_since_s":0.0}}}
+  ],
+  "search_finds_nothing": [
+   {"t_s":0.0,"crop":[100,100,300,300],"crop_det":null,"full_det":null,"expected":{"needs_full_frame":false,"detection":null,"searched_full_frame":false,"state":{"searching":false,"crop_miss_since_s":0.0}}},
+   {"t_s":0.15,"crop":[100,100,300,300],"crop_det":null,"full_det":null,"expected":{"needs_full_frame":true,"detection":null,"searched_full_frame":true,"state":{"searching":true,"crop_miss_since_s":0.0}}},
+   {"t_s":1.0,"crop":[100,100,300,300],"crop_det":null,"full_det":null,"expected":{"needs_full_frame":true,"detection":null,"searched_full_frame":true,"state":{"searching":true,"crop_miss_since_s":0.0}}}
+  ],
+  "search_returns_when_ball_back_in_crop": [
+   {"t_s":0.0,"crop":[100,100,300,300],"crop_det":null,"full_det":[800,100,820,120,0.9],"expected":{"needs_full_frame":false,"detection":null,"searched_full_frame":false,"state":{"searching":false,"crop_miss_since_s":0.0}}},
+   {"t_s":0.15,"crop":[100,100,300,300],"crop_det":null,"full_det":[800,100,820,120,0.9],"expected":{"needs_full_frame":true,"detection":[800,100,820,120,0.9],"searched_full_frame":true,"state":{"searching":true,"crop_miss_since_s":0.0}}},
+   {"t_s":1.0,"crop":[100,100,300,300],"crop_det":null,"full_det":[190,190,210,210,0.9],"expected":{"needs_full_frame":true,"detection":[190,190,210,210,0.9],"searched_full_frame":true,"state":{"searching":false,"crop_miss_since_s":null}}},
+   {"t_s":1.03,"crop":[100,100,300,300],"crop_det":[190,190,210,210,0.9],"full_det":null,"expected":{"needs_full_frame":false,"detection":[190,190,210,210,0.9],"searched_full_frame":false,"state":{"searching":false,"crop_miss_since_s":null}}}
+  ],
+  "no_crop_searches_at_once": [
+   {"t_s":0.0,"crop":null,"crop_det":null,"full_det":[800,100,820,120,0.9],"expected":{"needs_full_frame":true,"detection":[800,100,820,120,0.9],"searched_full_frame":true,"state":{"searching":true,"crop_miss_since_s":0.0}}}
+  ]
+ }
+}

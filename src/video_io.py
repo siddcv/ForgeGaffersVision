@@ -2,6 +2,7 @@
 import subprocess
 from collections.abc import Iterator
 from dataclasses import dataclass
+from pathlib import Path
 
 import cv2
 import numpy as np
@@ -14,8 +15,21 @@ class Frame:
     bgr: np.ndarray
 
 
+def timestamps_path(video_path: str) -> Path:
+    """Sidecar written by live.py: one real capture time per frame, because OpenCV's video writer
+    stores a constant frame rate and would lose the camera's actual timing."""
+    return Path(video_path).with_suffix(".timestamps.csv")
+
+
 def read_timestamps(path: str) -> np.ndarray:
-    """Return each frame's presentation time in seconds, starting at 0."""
+    """Return each frame's presentation time in seconds, starting at 0.
+
+    Uses the live recording's timestamps sidecar when there is one, else the file's own timestamps.
+    """
+    sidecar = timestamps_path(path)
+    if sidecar.exists():
+        times = np.loadtxt(sidecar, delimiter=",", skiprows=1, ndmin=1)
+        return times - times[0]
     result = subprocess.run(
         [
             "ffprobe", "-v", "error", "-select_streams", "v:0",

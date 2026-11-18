@@ -11,11 +11,10 @@ import cv2
 import numpy as np
 
 from . import ball as ball_module
-from . import metrics
 from .config import Config
-from .filters import OneEuroFilter
-from .face_pose import FacePoseEstimator
-from .pose import LEFT_FOOT, RIGHT_FOOT, PoseEstimator, coarse_head_pitch_deg, head_box, visible_points
+from .face_pose import open_head_pitch_sampler
+from .pipeline import POSE_PITCH, FramePipeline
+from .pose import LEFT_FOOT, RIGHT_FOOT, PoseEstimator, visible_points
 from .video_io import iter_frames, read_timestamps
 
 
@@ -36,18 +35,11 @@ def build_cache(clip_path: str, cache_path: Path, cfg: Config) -> None:
     tracker's diameter plays that role; changing crop settings needs --refresh.
     """
     pose = PoseEstimator()
-    try:
-        face_pose = FacePoseEstimator()
-        print("  Face Landmarker enabled (10 Hz head-pose sampling)")
-    except Exception as exc:
-        face_pose = None
-        print(f"  WARNING: Face Landmarker unavailable; using pose-only fallback: {exc}")
+    head_sampler, face_pose = open_head_pitch_sampler(cfg)
     detector = ball_module.YoloBallDetector(cfg)
     k = cfg.ball_candidates
     times, landmarks, head_pitch, crops, crop_balls, full_balls = [], [], [], [], [], []
     last_ms = -1
-    next_face_sample_s = 0.0
-    latest_face_pitch = None
     diameter = None
     try:
         for frame in iter_frames(clip_path):
@@ -56,27 +48,8 @@ def build_cache(clip_path: str, cache_path: Path, cfg: Config) -> None:
             last_ms = t_ms
             rgb = cv2.cvtColor(frame.bgr, cv2.COLOR_BGR2RGB)
             points = pose.detect(rgb, t_ms)
-            if face_pose is not None and frame.t_s + 1e-9 >= next_face_sample_s:
-                # Pose already localizes the player's head reliably. Face Landmarker
-                # misses the small face in the full portrait frame, so crop around
-                # the pose head box, make it square, and enlarge it before inference.
-                box = head_box(points, cfg.pose_min_visibility, cfg.head_box_padding)
-                latest_face_pitch = None
-                if box is not None:
-                    x1, y1, x2, y2 = box
-                    center_x, center_y = (x1 + x2) / 2, (y1 + y2) / 2
-                    side = max(x2 - x1, y2 - y1) * 1.5
-                    crop_x1 = max(0, int(center_x - side / 2))
-                    crop_y1 = max(0, int(center_y - side / 2))
-                    crop_x2 = min(width, int(center_x + side / 2))
-                    crop_y2 = min(height, int(center_y + side / 2))
-                    head_crop = frame.bgr[crop_y1:crop_y2, crop_x1:crop_x2]
-                    if head_crop.size:
-                        enlarged = cv2.resize(head_crop, (256, 256), interpolation=cv2.INTER_LINEAR)
-                        face_rgb = cv2.cvtColor(enlarged, cv2.COLOR_BGR2RGB)
-                        latest_face_pitch = face_pose.detect(face_rgb, t_ms)
-                next_face_sample_s = frame.t_s + cfg.head_pose_sample_interval_s
-            head_pitch.append(np.nan if latest_face_pitch is None else latest_face_pitch)
+            pitch = head_sampler.update(frame.bgr, points, frame.t_s, t_ms) if head_sampler else None
+            head_pitch.append(np.nan if pitch is None else pitch)
             feet = visible_points(points, LEFT_FOOT + RIGHT_FOOT, cfg.pose_min_visibility)
             crop = ball_module.foot_crop(feet, width, height, cfg, diameter)
             crop_dets = []
@@ -108,75 +81,34 @@ def build_cache(clip_path: str, cache_path: Path, cfg: Config) -> None:
     )
 
 
+def face_pitch(value) -> float | None:
+    """A cached Face Landmarker sample: NaN (no face found) means no pitch this frame."""
+    return float(value) if np.isfinite(value) else None
+
+
 def replay(cache, cfg: Config, stride: int = 1) -> list:
     """Feed cached model outputs through the same per-frame logic the phone will run."""
-    search = ball_module.SearchState()
-    tracker = ball_module.BallTracker(cfg)
-    state = metrics.initial_state()
+    pipeline = FramePipeline(cfg)
     crop_balls, full_balls = cache["crop_balls"], cache["full_balls"]
     if crop_balls.ndim == 2:  # caches written before candidates were kept
         crop_balls, full_balls = crop_balls[:, None, :], full_balls[:, None, :]
-    euro = {}
     records = []
     # If Face Landmarker produced any valid samples, do not silently mix its
     # measurements with the incompatible rough Pose estimate on missed frames.
     has_face_pitch = (
         "head_pitch_deg" in cache and np.isfinite(cache["head_pitch_deg"]).any()
     )
-
-    def smooth_points(indices, points_at, t_s):
-        smoothed = []
-        for index in indices:
-            if points_at[index, 2] < cfg.pose_min_visibility:
-                continue
-            xy = []
-            for axis in (0, 1):
-                key = (index, axis)
-                if key not in euro:
-                    euro[key] = OneEuroFilter(
-                        cfg.one_euro_min_cutoff, cfg.one_euro_beta, cfg.one_euro_d_cutoff,
-                    )
-                xy.append(euro[key].update(t_s, float(points_at[index, axis])))
-            smoothed.append(tuple(xy))
-        return tuple(smoothed)
-
     for i in range(0, len(cache["t_s"]), stride):
-        t_s = float(cache["t_s"][i])
         crop_row = cache["crops"][i]
-        crop = None if np.isnan(crop_row[0]) else tuple(crop_row)
-        left_foot = smooth_points(LEFT_FOOT, cache["landmarks"][i], t_s)
-        right_foot = smooth_points(RIGHT_FOOT, cache["landmarks"][i], t_s)
-        feet = left_foot + right_foot
-        search, detection, searched = ball_module.search_step(
-            search, t_s, crop,
-            tracker.choose(t_s, _from_rows(crop_balls[i]), feet),
-            tracker.choose(t_s, _from_rows(full_balls[i]), feet),
-            cfg,
+        record = pipeline.step(
+            t_s=float(cache["t_s"][i]),
+            landmarks=cache["landmarks"][i],
+            crop=None if np.isnan(crop_row[0]) else tuple(crop_row),
+            crop_candidates=_from_rows(crop_balls[i]),
+            full_candidates=_from_rows(full_balls[i]),
+            head_pitch_deg=face_pitch(cache["head_pitch_deg"][i]) if has_face_pitch else POSE_PITCH,
         )
-        ball_xy, predicted = tracker.update(t_s, detection, searched)
-        if has_face_pitch:
-            face_value = cache["head_pitch_deg"][i]
-            head_pitch = float(face_value) if np.isfinite(face_value) else None
-        else:
-            head_pitch = coarse_head_pitch_deg(cache["landmarks"][i], cfg.pose_min_visibility)
-        observation = metrics.Observation(
-            t_s=t_s,
-            # Metrics see detections only: on a real clip, snapping from a prediction back to the
-            # next detection looks like a direction change and adds false touches.
-            ball_xy=None if predicted else ball_xy,
-            ball_diameter_px=ball_module.box_diameter_px(detection) if detection else None,
-            searched_full_frame=searched,
-            left_foot=left_foot,
-            right_foot=right_foot,
-            head_pitch_deg=head_pitch,
-        )
-        state, events = metrics.step(state, observation, cfg)
-        records.append({
-            "index": i, "t_s": t_s, "crop": crop, "ball": detection, "ball_xy": ball_xy,
-            "predicted": predicted, "searched_full_frame": searched, "events": events,
-            "touch_rate": metrics.touch_rate(state, t_s, cfg),
-            "head_pitch_deg": head_pitch,
-        })
+        records.append({"index": i, **record})
     return records
 
 

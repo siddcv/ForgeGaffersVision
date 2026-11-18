@@ -85,3 +85,62 @@ class FacePoseEstimator:
 
     def close(self) -> None:
         self._landmarker.close()
+
+
+class HeadPitchSampler:
+    """Face Landmarker pitch, sampled causally every cfg.head_pose_sample_interval_s (10 Hz).
+
+    Pose already localizes the player's head reliably. Face Landmarker misses the small face in
+    the full portrait frame, so each sample crops around the pose head box, makes it square with
+    1.5x padding, and enlarges it to 256 x 256 before inference. The latest sample is held until
+    the next one; None means no face was found at the last sample. Used by build_cache (replay)
+    and live mode, so both measure pitch the same way.
+    """
+
+    CROP_SCALE = 1.5
+    INPUT_SIZE = 256
+
+    def __init__(self, estimator: "FacePoseEstimator", cfg):
+        self._estimator = estimator
+        self._cfg = cfg
+        self._next_sample_s = 0.0
+        self.latest = None
+
+    def update(self, bgr: np.ndarray, landmarks: np.ndarray, t_s: float, t_ms: int) -> float | None:
+        """Pitch for this frame. t_ms must increase from call to call, as for MediaPipe video."""
+        import cv2
+
+        from .pose import head_box
+
+        cfg = self._cfg
+        if t_s + 1e-9 < self._next_sample_s:
+            return self.latest
+        self.latest = None
+        box = head_box(landmarks, cfg.pose_min_visibility, cfg.head_box_padding)
+        if box is not None:
+            height, width = bgr.shape[:2]
+            x1, y1, x2, y2 = box
+            center_x, center_y = (x1 + x2) / 2, (y1 + y2) / 2
+            side = max(x2 - x1, y2 - y1) * self.CROP_SCALE
+            crop_x1 = max(0, int(center_x - side / 2))
+            crop_y1 = max(0, int(center_y - side / 2))
+            crop_x2 = min(width, int(center_x + side / 2))
+            crop_y2 = min(height, int(center_y + side / 2))
+            head_crop = bgr[crop_y1:crop_y2, crop_x1:crop_x2]
+            if head_crop.size:
+                enlarged = cv2.resize(head_crop, (self.INPUT_SIZE, self.INPUT_SIZE), interpolation=cv2.INTER_LINEAR)
+                self.latest = self._estimator.detect(cv2.cvtColor(enlarged, cv2.COLOR_BGR2RGB), t_ms)
+        self._next_sample_s = t_s + cfg.head_pose_sample_interval_s
+        return self.latest
+
+
+def open_head_pitch_sampler(cfg) -> tuple:
+    """(sampler, estimator), or (None, None) with a warning if Face Landmarker cannot start,
+    in which case callers fall back to the pose-only estimate. Close the estimator when done."""
+    try:
+        estimator = FacePoseEstimator()
+    except Exception as exc:
+        print(f"  WARNING: Face Landmarker unavailable; using pose-only fallback: {exc}")
+        return None, None
+    print("  Face Landmarker enabled (10 Hz head-pose sampling)")
+    return HeadPitchSampler(estimator, cfg), estimator

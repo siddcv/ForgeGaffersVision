@@ -38,6 +38,17 @@ python -m src.label_clip data/clips/<tune|test>/<session>/<clip>.mp4
 
 # Score a run against hand labels: writes output/<clip>_stride<N>/evaluation.json
 python -m src.evaluate output/<clip>_stride1/report.json
+
+# Live feedback from a camera (phone-as-webcam apps show up as a camera); records to data/clips/live/
+python -m src.live                     # camera 0; --source 1 for another, --rotate 90, --flip
+python -m src.live --source <clip>     # a clip played at its own pace, as if live
+
+# Portable test vectors for the Swift port (tests/vectors/): re-run after an intended logic or config change
+python -m scripts.export_test_vectors
+
+# Detector: export to ONNX and time it on CPU threads (Windows); Core ML export and check (macOS only)
+python -m scripts.bench_detector data/clips/tune/<session>/<clip>.mp4
+python -m scripts.export_coreml
 ```
 
 Clips live in `data/clips/tune/<session>/` (used to choose thresholds) or `data/clips/test/<session>/` (held out, scored once at the end), with one row per clip in `data/manifest.csv` and hand labels in `data/labels/<clip>.csv`; see `data/README.md`.
@@ -47,6 +58,7 @@ Clips live in `data/clips/tune/<session>/` (used to choose thresholds) or `data/
 ## Architecture
 Per-frame pipeline: frame + real timestamp -> pose (MediaPipe Pose) -> ball detection -> head pitch (MediaPipe Face Landmarker, ~5-10 Hz) -> causal filters (One Euro for keypoints, Kalman for the ball) -> rule-based metrics.
 
+- **Shared per-frame logic:** `FramePipeline.step` in `src/pipeline.py` runs everything after the models (smoothing, search switch, tracker, metrics). Replay calls it on cached outputs; live code and the Swift port follow the same steps.
 - **Ball search modes:** the detector normally runs on a foot crop derived from pose. After repeated misses it searches the full frame. A crop miss alone never counts as lost control. `ball.py` owns the switch; `metrics.py` receives a `searched_full_frame` flag.
 - **Foot crop size:** the untuned detector misses balls that look too large or too small in its input (it works at about 40-80 px). The crop is therefore square, sized so the last seen ball fills `crop_ball_frac` of it, padded with gray past the frame edge, and run at `crop_imgsz`.
 - **Ball tracking:** `BallTracker` in `ball.py` picks, among several candidate boxes, the one nearest the Kalman prediction, and predicts through gaps up to `track_max_predict_s` (never while searching). Metrics receive detections only; predictions are for the overlay and future frame skipping, since feeding them to the touch rule added false touches on real clips.

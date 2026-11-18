@@ -1,0 +1,198 @@
+GAFFER'S VISION: LIVE RECORDING SETUP (MAC)
+===========================================
+
+This gets the pipeline running live on a Mac with a phone as the camera, records each session,
+and sends the recordings back so we can check the counts. First-time setup takes about 30 minutes;
+after that, a session is one command.
+
+
+0. STATUS: FROM LAPTOP TO PHONE (as of 2026-11-17)
+--------------------------------------------------
+Right now the phone is only a camera (through Camo). Everything runs on the laptop: pose, ball
+detection, tracking, metrics and the overlay. Moving to the phone means exporting the ball detector
+to Core ML and rewriting the code around the models in Swift. The pose model file is reused as is.
+
+Done
+[x] One per-frame function shared by replay, live and the future Swift app
+    (FramePipeline.step in src/pipeline.py)
+[x] Full-frame ball search runs only when needed (about 7% of frames), as on the phone
+[x] Ball detector exported to ONNX and timed on the laptop CPU; same detections as PyTorch
+    (scripts/bench_detector.py)
+[x] Core ML export script for a Mac (scripts/export_coreml.py), not run yet
+[x] Preprocessing spec the Swift app must match (docs/PREPROCESSING.md)
+[x] Portable test vectors so the Swift port can check itself (tests/vectors/)
+[x] Live demo on a laptop with a phone as the camera, with recording (src/live.py)
+[x] Live demo runs on a teammate's Mac with Camo; the overlay shows the phone's video
+
+Still to do
+Laptop (no Mac needed)
+[ ] Run the drills in this checklist and compare screen counts with hand counts
+[ ] Label, replay and score the live recordings
+[ ] evaluate.py support for live session summaries (output/live/*.json)
+[ ] Fix what the drills show, then the rule gaps (first touch from a still ball, missed crossings)
+[ ] Optional: check touch accuracy at 15 fps vs 30 fps on the labelled clips
+
+Mac
+[ ] Run the Core ML export (pip install coremltools; python -m scripts.export_coreml) and keep
+    models/*.mlpackage and output/coreml_check.json
+[ ] Install Xcode (about 10 GB); every step below needs it
+
+iPhone app (Mac + Xcode + iPhone)
+[ ] Camera + MediaPipe pose + live skeleton on a real iPhone; first real speed number
+[ ] A mode that replays recorded clips through the app, so it can be scored like Python
+[ ] Core ML ball detector on the foot crop; full-frame search mode
+[ ] Swift port of the logic, passing every test vector
+[ ] Same labelled clips through Python and the iPhone, with matching scores
+[ ] Live screen: tick-tocks by foot, pace, lost-control and head-down alerts
+[ ] Start/stop, 60 s sustained run on the oldest supported iPhone, slow down when hot
+[ ] Alignment screen, then session history
+
+Decisions still open
+[ ] Detector licence: YOLOv8n is AGPL, which conflicts with the App Store; YOLOX-nano (Apache)
+    is the default alternative (ask the advisor / tech transfer)
+[ ] What the live screen shows, given that tick-tocks confirm about 0.4 s late
+[ ] Lost-control rule: a still ball between wide-apart feet currently counts as lost control
+[ ] Who owns the iOS app, the detector, and the Swift port
+[ ] Detector fine-tuning: only if the drill results show the detector is a big share of errors
+
+
+1. BEFORE YOU START
+-------------------
+[ ] A Mac you can install software on (Apple Silicon is best)
+[ ] Camo installed on both the phone and the Mac, plus a cable to connect them (steadier than Wi-Fi)
+[ ] A phone stand, or something to prop the phone on, low and in front of the player
+[ ] A ball, a player, and about 3 m of clear floor in front of the phone
+[ ] A second person to count tick-tocks by hand during each drill
+[ ] Internet for the first run only (the models download once; after that it runs offline)
+
+
+2. ONE-TIME SETUP
+-----------------
+[ ] Install Python 3.12. Check with:
+        python3.12 --version
+    If it is missing and you cannot install apps, use uv instead (no admin rights needed):
+        curl -LsSf https://astral.sh/uv/install.sh | sh
+        uv venv --python 3.12 ~/.venvs/gaffers-vision
+    (then skip the python3.12 -m venv line below)
+
+[ ] Get the code on the realtimeOnEdge branch:
+        git clone https://github.com/siddcv/ForgeGaffersVision.git
+        cd ForgeGaffersVision
+        git switch realtimeOnEdge
+
+[ ] Create and activate the environment, then install the packages:
+        python3.12 -m venv ~/.venvs/gaffers-vision
+        source ~/.venvs/gaffers-vision/bin/activate
+        pip install -r requirements.txt
+    requirements.txt was made on Windows. If one pinned version fails to install, install that
+    package without the version (e.g. pip install mediapipe) and tell Siddharth which one it was.
+
+[ ] Run the tests (should all pass, about 170):
+        python -m pytest
+
+[ ] Open Camo on the phone and on the Mac and confirm the Mac shows the phone's camera.
+
+Every later session: open a terminal, then
+        cd ForgeGaffersVision
+        source ~/.venvs/gaffers-vision/bin/activate
+        git pull
+
+
+3. CAMERA PLACEMENT
+-------------------
+[ ] Phone in front of the player, facing them (front-facing view), lens low: about knee to hip height
+[ ] About 2-3 m away, so the legs, feet and ball are always in frame (whole body is better)
+[ ] Phone held still; do not move it during a drill
+[ ] Even light, no bright window behind the player
+[ ] Write down the height and distance (in metres) for each setup you try
+
+
+4. RUNNING A LIVE SESSION
+-------------------------
+[ ] Start it:
+        python -m src.live --source 0
+    If the window shows the Mac's own camera, quit and try --source 1, then --source 2.
+
+[ ] First run only:
+    - macOS asks for camera access for Terminal (or VS Code). Allow it, then run the command again.
+    - The models download and the ball detector is converted once; this takes a minute or two.
+
+[ ] Fix the picture if needed:
+        --rotate 90        image is sideways (also 180 or 270)
+        --flip             image is mirrored
+    Check left and right: tap only with the player's LEFT foot; the LEFT contact count should go up.
+    If the right one goes up instead, add --flip.
+
+[ ] Keys in the window:
+        q or Esc           stop (the recording and summary are saved)
+        r                  reset the counts between drills
+
+[ ] Do 3-4 short drills of about 20 s each. Start one session per setup, so each recording has
+    one camera position.
+
+
+5. WHAT TO CHECK AND WRITE DOWN
+-------------------------------
+Status line (bottom of the window):
+[ ] fps, proc (processing ms) and lag after it settles.
+    Good: above 15 fps and lag under about 150 ms. Below 10 fps, note it.
+
+On screen during the drills:
+[ ] Orange box stays on the ball most of the time. Note when it loses it (blur, ball against
+    shoes, lighting).
+[ ] Cyan box follows the feet with the ball inside it.
+[ ] Top-left mostly says TRACK; SEARCH only briefly when the ball is hidden. Note long SEARCH
+    while the ball is clearly visible.
+[ ] Tick-tock count vs the hand count, per drill (e.g. "screen 31, hand 34").
+[ ] Left/right split matches the feet; note any swaps.
+
+Try each of these once, on purpose:
+[ ] Lose the ball properly (let it roll away). Lost control should appear.
+[ ] Stop with the ball still between the feet for 2-3 s. Note whether it wrongly says lost control
+    (known issue).
+[ ] A few double touches with the same foot. These should count as contacts, not tick-tocks.
+[ ] Look down at the ball for more than 1 s. Note whether head-down reacts (rough estimate only).
+
+How it feels:
+[ ] "contact" flashes right away; "TICK-TOCK" confirms about 0.4 s later. Is that OK or confusing?
+[ ] Which height and distance gave the steadiest ball box?
+
+
+6. WHAT TO SEND BACK
+--------------------
+Recordings are saved in:
+        data/clips/live/<date>/live_<time>.mp4
+        data/clips/live/<date>/live_<time>.timestamps.csv     (real capture times; keep it with the .mp4)
+Summaries and events are saved in:
+        output/live/live_<time>.json
+
+[ ] Your notes from section 5, with the drill times
+[ ] One clean drill and one messy drill: each .mp4 AND its .timestamps.csv
+[ ] The matching output/live/*.json files
+
+Send the files by cable, AirDrop or a shared drive, not through a messaging app (it re-compresses
+the video). Clips are not in git, so do not commit them.
+
+
+7. TROUBLESHOOTING
+------------------
+"Could not open camera 0"
+    Try --source 1 or 2. Check that Camo is open on both devices and the phone is connected.
+
+Window opens but stays black, or the camera is refused
+    System Settings > Privacy & Security > Camera: allow Terminal (or VS Code), then restart it.
+
+pip install fails on one package
+    Install that package without the version number and report which one.
+
+Image is sideways or mirrored
+    --rotate 90 / 180 / 270, and --flip. Recheck left/right with the left-foot-only test.
+
+Very low fps (below 10)
+    Close other apps. Note the number anyway; it is useful data.
+
+"ModuleNotFoundError: No module named 'src'"
+    Run the commands from inside the ForgeGaffersVision folder.
+
+Something else
+    Copy the full error text from the terminal and send it to Siddharth.

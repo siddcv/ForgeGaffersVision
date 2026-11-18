@@ -12,6 +12,16 @@ GRAY = (180, 180, 180)
 GREEN = (0, 255, 0)
 
 
+def update_head_down(head_down: bool, events) -> bool:
+    """Follow the head_down and head_up events reported on this frame (live: as they arrive)."""
+    for event in events:
+        if event.kind == "head_down":
+            head_down = True
+        elif event.kind == "head_up":
+            head_down = False
+    return head_down
+
+
 def get_head_down_intervals(records):
     """Reconstruct head-down intervals using original event timestamps."""
     events = []
@@ -125,6 +135,52 @@ def _draw_flashes(image, last_reported: dict, t_s: float) -> None:
             image, "contact", (300, 200),
             cv2.FONT_HERSHEY_SIMPLEX, 1.2, GRAY, 3
         )
+
+
+class Hud:
+    """What the overlay remembers between frames: running counts, flash times, head state."""
+
+    def __init__(self):
+        self.counts = {("touch", "left"): 0, ("touch", "right"): 0,
+                       ("contact", "left"): 0, ("contact", "right"): 0}
+        self.last_reported = {"touch": float("-inf"), "contact": float("-inf")}
+        self.head_down = False
+
+    def update(self, events, t_s: float) -> None:
+        for event in events:
+            if (event.kind, event.foot) in self.counts:
+                self.counts[(event.kind, event.foot)] += 1
+                self.last_reported[event.kind] = t_s
+        self.head_down = update_head_down(self.head_down, events)
+
+
+def draw(image, record: dict, landmarks, hud: Hud, cfg, t_s: float) -> None:
+    """Draw one frame's overlay in place. Call hud.update(record["events"], t_s) first."""
+    _draw_skeleton(image, landmarks, cfg.pose_min_visibility)
+    if record["crop"] is not None:
+        x1, y1, x2, y2 = map(int, record["crop"])
+        cv2.rectangle(image, (x1, y1), (x2, y2), (255, 255, 0), 1)
+    if record["ball"] is not None:
+        x1, y1, x2, y2 = map(int, record["ball"][:4])
+        cv2.rectangle(image, (x1, y1), (x2, y2), (0, 165, 255), 2)
+    elif record.get("predicted"):
+        # Tracker prediction through a short detection gap.
+        center = tuple(map(int, record["ball_xy"]))
+        cv2.circle(image, center, 25, (0, 165, 255), 2)
+        cv2.putText(image, "pred", (center[0] + 30, center[1]), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 165, 255), 2)
+    _draw_head(image, landmarks, hud.head_down, cfg, record.get("head_pitch_deg"))
+    _draw_flashes(image, hud.last_reported, t_s)
+    counts = hud.counts
+    mode = "SEARCH" if record["searched_full_frame"] else "TRACK"
+    cv2.putText(
+        image, f"{mode}  tick-tock L:{counts['touch', 'left']} R:{counts['touch', 'right']}"
+        f"  t={t_s:.2f}s", (20, 40), cv2.FONT_HERSHEY_SIMPLEX, 1.0, WHITE, 2,
+    )
+    cv2.putText(
+        image, f"contacts L:{counts['contact', 'left']} R:{counts['contact', 'right']}", (20, 160),
+        cv2.FONT_HERSHEY_SIMPLEX, 1.0, GRAY, 2,
+    )
+    _draw_touch_rate(image, record.get("touch_rate"), cfg.touches_per_minute_goal)
 
 
 def render(clip_path: str, out_path: str, records: list, landmarks, cfg) -> None:
