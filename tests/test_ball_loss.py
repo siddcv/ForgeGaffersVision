@@ -16,24 +16,19 @@ CFG = Config(
 )
 
 
-def run(touch_schedule, fps=30.0, cfg=CFG):
-    """Replay frames; touch_schedule is times that count as touches."""
+def run(touch_schedule, fps=30.0, cfg=CFG, delays_s=(0.0,)):
+    """Feed touch events as metrics would emit them.
+
+    Touch times snap to the frame grid. Each touch is reported delays_s[i % len]
+    seconds after it happened (the touch detector's latency, up to touch_max_gap_s).
+    """
     state = initial_state()
     events = []
-    if not touch_schedule:
-        return events
-    end_s = max(touch_schedule) + 1.0
-    t = 0.0
-    dt = 1.0 / fps
-    remaining = sorted(touch_schedule)
-    while t <= end_s + 1e-9:
-        touched = False
-        if remaining and abs(t - remaining[0]) < dt * 0.51:
-            touched = True
-            remaining.pop(0)
-        state, new_events = step(state, t, touched, cfg)
+    for i, t in enumerate(sorted(touch_schedule)):
+        touch_t_s = round(t * fps) / fps
+        reported_t_s = touch_t_s + delays_s[i % len(delays_s)]
+        state, new_events = step(state, touch_t_s, reported_t_s, cfg)
         events += new_events
-        t += dt
     return events
 
 
@@ -85,3 +80,20 @@ def test_brief_gap_works_at_common_frame_rates(fps):
     after = [6.2, 6.7, 7.2, 7.7]
     losses = [e for e in run(before + after, fps=fps) if e.kind == "ball-loss"]
     assert len(losses) == 1
+
+
+def test_uneven_touch_report_delay_is_not_ball_loss():
+    # Steady play, but the detector reports touches alternately on time and 0.25 s late
+    # (foot hides the ball). Report-time gaps go 0.75, 0.25, 0.75, ... which looks like
+    # late-then-recover; gaps must be measured on touch times instead.
+    assert run(steady_touches(12.0), delays_s=(0.0, 0.25)) == []
+
+
+def test_ball_loss_times_gap_start_and_confirming_report():
+    before = steady_touches(5.0)  # last steady touch at 5.0
+    after = [6.2, 6.7, 7.2, 7.7]  # 6.7 confirms recovery
+    losses = [e for e in run(before + after, delays_s=(0.1,)) if e.kind == "ball-loss"]
+    assert len(losses) == 1
+    assert losses[0].t_s == pytest.approx(5.0)
+    assert losses[0].value == pytest.approx(1.2)
+    assert losses[0].reported_t_s == pytest.approx(6.7 + 0.1)

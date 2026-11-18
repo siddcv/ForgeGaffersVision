@@ -1,6 +1,6 @@
 """Frequency-disruption ball-loss detector.
 
-Standalone and causal: call step(state, t_s, touched, cfg) once per frame.
+Standalone and causal: call step(state, touch_t_s, reported_t_s, cfg) once per touch.
 Standard library only. cfg is any object with the ball_loss_* fields of
 config.Config, passed in so this module imports nothing else.
 
@@ -47,16 +47,18 @@ def _late_threshold_s(baseline_interval_s: float, cfg) -> float:
 
 def step(
     state: BallLossState,
-    t_s: float,
-    touched: bool,
+    touch_t_s: float,
+    reported_t_s: float,
     cfg,
 ) -> tuple:
-    """Advance one frame. Returns (new_state, events)."""
-    if not touched:
-        return state, []
+    """Advance one touch. Returns (new_state, events).
 
+    touch_t_s is when the touch happened (a metrics touch Event's t_s) and drives
+    all gap timing. reported_t_s is when the touch was detected (its reported_t_s);
+    it only stamps when a loss is confirmed, so detection latency stays measurable.
+    """
     events = []
-    start_t_s = state.start_t_s if state.start_t_s is not None else t_s
+    start_t_s = state.start_t_s if state.start_t_s is not None else touch_t_s
     last_touch_t_s = state.last_touch_t_s
     intervals = state.intervals
     baseline_interval_s = state.baseline_interval_s
@@ -64,14 +66,14 @@ def step(
     pending_gap_s = state.pending_gap_s
 
     if last_touch_t_s is not None:
-        gap = t_s - last_touch_t_s
+        gap = touch_t_s - last_touch_t_s
         if gap > 0:
             intervals = (intervals + (gap,))[-cfg.ball_loss_history_intervals :]
 
             # Lock baseline after enough steady intervals in the warmup window.
             if (
                 baseline_interval_s is None
-                and t_s - start_t_s >= cfg.ball_loss_baseline_s
+                and touch_t_s - start_t_s >= cfg.ball_loss_baseline_s
                 and len(intervals) >= cfg.ball_loss_min_baseline_intervals
             ):
                 baseline_interval_s = _mean(intervals)
@@ -86,7 +88,7 @@ def step(
                             BallLossEvent(
                                 "ball-loss",
                                 pending_loss_t_s,
-                                t_s,
+                                reported_t_s,
                                 value=pending_gap_s,
                             )
                         )
@@ -102,7 +104,7 @@ def step(
 
     new_state = replace(
         state,
-        last_touch_t_s=t_s,
+        last_touch_t_s=touch_t_s,
         start_t_s=start_t_s,
         intervals=intervals,
         baseline_interval_s=baseline_interval_s,
