@@ -12,7 +12,9 @@ press space) counts down, then resets the counts and starts the drill; STOP ends
 from a camera is recorded to data/clips/live/<date>/drill_<time>.mp4 with a timestamps sidecar
 holding each frame's real capture time, and its summary goes to output/live/drill_<time>.json,
 with times from the drill's first frame, so it can be labelled (src.label_clip), replayed
-(src.run_clip) and scored (src.evaluate) like any clip. A clip source starts one drill at once.
+(src.run_clip) and scored (src.evaluate) like any clip. The window's view (overlay, counts, REC)
+is also saved, as output/live/drill_<time>_overlay.mp4, playing at real speed; it is not a clip
+to label or replay. A clip source starts one drill at once.
 
 Usage:
     python -m src.live                       # camera 0 (phone-as-webcam apps show up as a camera)
@@ -316,25 +318,71 @@ def minutes(seconds: float) -> str:
     return f"{int(seconds // 60)}:{int(seconds % 60):02d}"
 
 
+class OverlayRecorder:
+    """The live window's view (overlay, counts, REC, STOP), saved as a video that plays at real
+    speed. The window only updates when a frame has been processed (about 10-15 times a second on
+    a laptop), so each view is repeated until the next one, at a steady FPS. It shows exactly what
+    the player saw; for a smooth overlay on every frame, replay the raw recording with run_clip."""
+
+    FPS = 30.0
+
+    def __init__(self, path: Path):
+        self.path = path
+        self._writer = None
+        self._size = None
+        self._last = None
+        self.written = 0
+
+    def add(self, view, t_s: float) -> None:
+        """view: the displayed image; t_s: seconds since the drill started."""
+        if self._writer is None:
+            self._size = (view.shape[1], view.shape[0])
+            self._writer, self.path = open_video_writer(self.path, self.FPS, self._size)
+        if (view.shape[1], view.shape[0]) != self._size:
+            view = cv2.resize(view, self._size)
+        self._fill_to(t_s)
+        self._writer.write(view)
+        self.written += 1
+        self._last = view
+
+    def _fill_to(self, t_s: float) -> None:
+        target = int(round(t_s * self.FPS))
+        while self._last is not None and self.written < target:
+            self._writer.write(self._last)
+            self.written += 1
+
+    def close(self, end_t_s: float) -> Path | None:
+        """Finish the file, holding the last view until the drill's end; the saved path or None."""
+        if self._writer is None:
+            return None
+        self._fill_to(end_t_s)
+        self._writer.release()
+        self._writer = None
+        return self.path
+
+
 class Drill:
     """One drill: from START (after the countdown) to STOP. Counts, events and timing restart for
     each drill, and its times are seconds from the drill's first frame, the same time base as its
     recording, so the summary can be scored against labels made on that recording."""
 
-    def __init__(self, cfg, name: str, record_path: Path | None):
+    def __init__(self, cfg, name: str, record_path: Path | None, save_overlay: bool = False):
         self.pipeline, self.hud = FramePipeline(cfg), Hud()
         self.name = name
         self.record_path = record_path
+        self.overlay = OverlayRecorder(Path("output") / "live" / f"{name}_overlay.mp4") if save_overlay else None
         self.proc_ms, self.lag_ms, self.events = [], [], []
         self.full_frame_runs = 0
         self.last_t = 0.0
 
 
 def save_drill(drill: Drill, recording: Path | None, source: "FrameSource", args, is_camera: bool) -> None:
+    overlay = drill.overlay.close(drill.last_t) if drill.overlay is not None else None
     counts = {f"{kind}_{foot}": n for (kind, foot), n in drill.hud.counts.items()}
     summary = {
         "source": args.source,
         "recording": str(recording) if recording else None,
+        "overlay_video": str(overlay) if overlay else None,
         "drill_s": round(drill.last_t, 2),
         "frames_processed": len(drill.proc_ms),
         "full_frame_runs": drill.full_frame_runs,
@@ -355,6 +403,8 @@ def save_drill(drill: Drill, recording: Path | None, source: "FrameSource", args
         print(f"Saved {out}. WARNING: no recording was written (expected near {drill.record_path.resolve()}).")
     else:
         print(f"Saved {out}")
+    if overlay is not None:
+        print(f"Saved the overlay video {overlay.resolve()}")
 
 
 def main() -> None:
@@ -371,6 +421,8 @@ def main() -> None:
     parser.add_argument("--autostart", action="store_true",
                         help="start a drill at once, without the button (always on for clips and --no-window)")
     parser.add_argument("--no-record", action="store_true", help="count drills without saving video")
+    parser.add_argument("--no-overlay-video", action="store_true",
+                        help="do not save the window's view (output/live/drill_<time>_overlay.mp4)")
     parser.add_argument("--no-window", action="store_true", help="no display, e.g. for a timing run")
     parser.add_argument("--max-seconds", type=float, help="stop after this long")
     args = parser.parse_args()
@@ -389,7 +441,7 @@ def main() -> None:
         if is_camera and not args.no_record:
             record_path = Path("data/clips/live") / f"{now:%Y-%m-%d}" / f"drill_{now:%H%M%S}.mp4"
         name = record_path.stem if record_path else f"{Path(args.source).stem if not is_camera else 'drill'}_{now:%H%M%S}"
-        return Drill(cfg, name, record_path)
+        return Drill(cfg, name, record_path, save_overlay=not (args.no_overlay_video or args.no_window))
 
     source = FrameSource(args.source, args.rotate, args.flip, args.width, args.height)
     preview = FramePipeline(cfg)  # keeps the overlay (feet, ball) running between drills; never counts
@@ -470,6 +522,8 @@ def main() -> None:
                 draw_banner(view, f"{'REC' if recording else 'DRILL'} {minutes(drill.last_t)}",
                             (0, 0, 255) if recording else (255, 255, 255))
                 button.draw(view, "STOP", (0, 0, 200))
+                if counting and drill.overlay is not None:
+                    drill.overlay.add(view, t_used)
             cv2.imshow(WINDOW, view)
             key = cv2.waitKey(1) & 0xFF
             if key in (ord("q"), 27):

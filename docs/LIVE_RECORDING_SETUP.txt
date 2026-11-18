@@ -178,10 +178,12 @@ Recordings are saved in:
     (.avi instead of .mp4 if this Mac cannot write .mp4; the terminal says which)
 Summaries and events are saved in:
         output/live/drill_<time>.json
+The live window's view (overlay, counts, REC), as a video that plays at real speed:
+        output/live/drill_<time>_overlay.mp4     (for watching only: label and replay the raw .mp4)
 
 [ ] Your notes from section 5, with the drill times
 [ ] One clean drill and one messy drill: each .mp4 AND its .timestamps.csv
-[ ] The matching output/live/*.json files
+[ ] The matching output/live/*.json files, and the _overlay.mp4 videos if something looked wrong
 
 Send the files by cable, AirDrop or a shared drive, not through a messaging app (it re-compresses
 the video). Clips are not in git, so do not commit them.

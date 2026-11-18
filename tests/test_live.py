@@ -1,3 +1,4 @@
+import pytest
 import cv2
 import numpy as np
 
@@ -121,3 +122,30 @@ def test_each_drill_is_recorded_from_start_to_stop(tmp_path, monkeypatch):
         assert frames_in(path) == len(times) >= at_least
         assert times[0] == 0 and (times[1:] > times[:-1]).all()
     assert source.recording_path is None and source.drill_t0 is None
+
+
+def test_overlay_video_plays_at_real_speed(tmp_path):
+    from src.live import OverlayRecorder
+
+    recorder = OverlayRecorder(tmp_path / "drill_overlay.mp4")
+    # Views arrive unevenly, as the live loop shows them (about 12 per second), over a 2 s drill.
+    for i, t_s in enumerate([0.0, 0.07, 0.2, 0.31, 0.5, 0.9, 1.3, 1.5]):
+        recorder.add(np.full((48, 64, 3), 30 * i, np.uint8), t_s)
+    path = recorder.close(end_t_s=2.0)
+
+    capture = cv2.VideoCapture(str(path))
+    assert capture.get(cv2.CAP_PROP_FPS) == pytest.approx(30.0)
+    frames = []
+    while (frame := capture.read())[0]:
+        frames.append(frame[1])
+    assert len(frames) == 60  # 2.0 s at 30 fps
+    # The view shown at 0.5 s (index 4) stays on screen until the next one at 0.9 s.
+    # Compression shifts flat gray by a few levels; neighbouring views differ by 30.
+    assert abs(int(frames[20][0, 0, 0]) - 120) <= 8 and abs(int(frames[26][0, 0, 0]) - 120) <= 8
+
+
+def test_no_overlay_video_when_nothing_was_shown(tmp_path):
+    from src.live import OverlayRecorder
+
+    assert OverlayRecorder(tmp_path / "x.mp4").close(5.0) is None
+    assert not list(tmp_path.iterdir())
