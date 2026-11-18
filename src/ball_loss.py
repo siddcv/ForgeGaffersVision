@@ -1,7 +1,8 @@
 """Frequency-disruption ball-loss detector.
 
 Standalone and causal: call step(state, t_s, touched, cfg) once per frame.
-Does not import metrics or config; wire thresholds and touch events in later.
+Standard library only. cfg is any object with the ball_loss_* fields of
+config.Config, passed in so this module imports nothing else.
 
 A ball loss is a single unusually long gap between touches that is then
 followed by a return to the baseline pace. A sustained slowdown (another
@@ -9,21 +10,6 @@ long gap right after) is a pace change, not a loss. Faster play is never
 a loss.
 """
 from dataclasses import dataclass, replace
-
-
-@dataclass(frozen=True)
-class BallLossConfig:
-    """Thresholds for the frequency rule. Durations are in seconds."""
-
-    baseline_s: float = 4.0
-    # A gap counts as late once it exceeds baseline_interval / (1 - drop_frac).
-    drop_frac: float = 0.3
-    dip_min_s: float = 0.4
-    dip_max_s: float = 2.5
-    # Need at least this many intervals before locking a baseline.
-    min_baseline_intervals: int = 4
-    # Keep recent intervals for baseline / pace updates.
-    history_intervals: int = 12
 
 
 @dataclass(frozen=True)
@@ -55,15 +41,15 @@ def _mean(values: tuple) -> float | None:
     return sum(values) / len(values)
 
 
-def _late_threshold_s(baseline_interval_s: float, cfg: BallLossConfig) -> float:
-    return max(cfg.dip_min_s, baseline_interval_s / (1.0 - cfg.drop_frac))
+def _late_threshold_s(baseline_interval_s: float, cfg) -> float:
+    return max(cfg.ball_loss_dip_min_s, baseline_interval_s / (1.0 - cfg.ball_loss_drop_frac))
 
 
 def step(
     state: BallLossState,
     t_s: float,
     touched: bool,
-    cfg: BallLossConfig,
+    cfg,
 ) -> tuple:
     """Advance one frame. Returns (new_state, events)."""
     if not touched:
@@ -80,13 +66,13 @@ def step(
     if last_touch_t_s is not None:
         gap = t_s - last_touch_t_s
         if gap > 0:
-            intervals = (intervals + (gap,))[-cfg.history_intervals :]
+            intervals = (intervals + (gap,))[-cfg.ball_loss_history_intervals :]
 
             # Lock baseline after enough steady intervals in the warmup window.
             if (
                 baseline_interval_s is None
-                and t_s - start_t_s >= cfg.baseline_s
-                and len(intervals) >= cfg.min_baseline_intervals
+                and t_s - start_t_s >= cfg.ball_loss_baseline_s
+                and len(intervals) >= cfg.ball_loss_min_baseline_intervals
             ):
                 baseline_interval_s = _mean(intervals)
 
@@ -108,10 +94,10 @@ def step(
                         baseline_interval_s = gap
                     pending_loss_t_s = None
                     pending_gap_s = None
-                elif late_s <= gap <= cfg.dip_max_s:
+                elif late_s <= gap <= cfg.ball_loss_dip_max_s:
                     pending_loss_t_s = last_touch_t_s
                     pending_gap_s = gap
-                elif gap > cfg.dip_max_s:
+                elif gap > cfg.ball_loss_dip_max_s:
                     baseline_interval_s = gap
 
     new_state = replace(

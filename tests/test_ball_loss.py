@@ -1,16 +1,18 @@
 """Synthetic tests for the frequency-disruption ball-loss detector."""
 import pytest
 
-from src.ball_loss import BallLossConfig, initial_state, step
+from src.ball_loss import initial_state, step
+from src.config import Config
 
 # Steady tick-tock at 2 touches/s.
 STEADY_INTERVAL_S = 0.5
-CFG = BallLossConfig(
-    baseline_s=4.0,
-    drop_frac=0.3,
-    dip_min_s=0.4,
-    dip_max_s=2.5,
-    min_baseline_intervals=4,
+# Pinned here so retuning config.py defaults doesn't silently change what these tests check.
+CFG = Config(
+    ball_loss_baseline_s=4.0,
+    ball_loss_drop_frac=0.3,
+    ball_loss_dip_min_s=0.4,
+    ball_loss_dip_max_s=2.5,
+    ball_loss_min_baseline_intervals=4,
 )
 
 

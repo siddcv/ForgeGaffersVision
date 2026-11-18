@@ -15,16 +15,16 @@ Ideas to explore:
 - Spatial / miss lost-control already lives in `src/metrics.py` (full-frame miss or ball far from feet for `lost_control_min_s`; crop-only misses do not count).
 - Touch detection by foot already lives in `src/metrics.py` (horizontal reversal near a foot).
 - New standalone frequency detector in `src/ball_loss.py`:
-  - Builds a baseline inter-touch interval after `baseline_s` of play.
-  - A gap is "late" once it exceeds `baseline_interval / (1 - drop_frac)` (and at least `dip_min_s`), up to `dip_max_s`.
+  - Builds a baseline inter-touch interval after `ball_loss_baseline_s` of play.
+  - A gap is "late" once it exceeds `baseline_interval / (1 - ball_loss_drop_frac)` (and at least `ball_loss_dip_min_s`), up to `ball_loss_dip_max_s`.
   - Emits `ball-loss` only when a late gap is followed by a return to near-baseline pace (recovery confirmation).
   - Another late gap instead of recovery updates the baseline (pace change); speed-ups never count as a loss.
-  - Own `BallLossConfig` / `BallLossState` / `BallLossEvent`; not wired into `metrics.step` yet.
+  - Thresholds are `ball_loss_*` fields on `Config` in `src/config.py`; own `BallLossState` / `BallLossEvent`; not wired into `metrics.step` yet.
 - Synthetic coverage in `tests/test_ball_loss.py` (steady play, brief gap, sustained slowdown, speed-up, pre-baseline gap, 30/60 fps).
 
 # To-do
 - Wire `ball_loss.step` into `metrics.step` (or `run_clip`) after each touch / frame, using real touch events.
-- Move `BallLossConfig` fields into `src/config.py` and pass them through like other thresholds.
+- ~~Move `BallLossConfig` fields into `src/config.py` and pass them through like other thresholds.~~ Done (roadmap step 1).
 - Map `ball-loss` events to the existing `lost_control` label kind (or document a subtype) and de-dupe with spatial lost-control when both fire.
 - Tune thresholds on labelled `lost-in-frame`, `lost-out-of-frame`, `baseline`, and `slow-fast` clips.
 - Decide whether to keep combined rate only or add per-foot baselines.
@@ -34,7 +34,7 @@ Ideas to explore:
 Steps in order; the to-do items above map onto them.
 
 - [x] **0. Rename** `ball-loss.py` -> `ball_loss.py` (and its test) so it imports normally.
-- [ ] **1. Thresholds into `config.py`.** Add the `BallLossConfig` fields to `Config` with a `ball_loss_` prefix, make `ball_loss.step` take any object with those fields (like `metrics.py`), drop `BallLossConfig`. Stays stdlib-only.
+- [x] **1. Thresholds into `config.py`.** Add the `BallLossConfig` fields to `Config` with a `ball_loss_` prefix, make `ball_loss.step` take any object with those fields (like `metrics.py`), drop `BallLossConfig`. Stays stdlib-only.
 - [ ] **2. Feed touch times, not a per-frame flag.** Change to `step(state, touch_t_s, cfg)`, called once per touch event using the event's `t_s`. `metrics` stamps a touch at the previous ball frame and reports it a frame later, so the current flag is off by a frame or more. Add a test with uneven frame times.
 - [ ] **3. Decide the design questions** (see Open questions), in particular:
   - Event kind: new `rhythm_loss`, or `lost_control` plus a `source` field on `Event`.

@@ -25,6 +25,14 @@ class Config:
     lost_distance_diam: float = 1.5
     lost_control_min_s: float = 0.5
 
+    # Ball loss from touch rhythm (ball_loss.py)
+    ball_loss_baseline_s: float = 4.0  # play this long before locking a baseline pace
+    ball_loss_drop_frac: float = 0.3  # a gap is late once it exceeds baseline / (1 - drop_frac)
+    ball_loss_dip_min_s: float = 0.4  # a late gap is at least this long
+    ball_loss_dip_max_s: float = 2.5  # longer gaps are a pause or pace change, not a loss
+    ball_loss_min_baseline_intervals: int = 4  # intervals needed before locking a baseline
+    ball_loss_history_intervals: int = 12  # recent intervals kept
+
     # Head position
     head_down_pitch_deg: float = -20.0
     head_up_pitch_deg: float = -15.0
