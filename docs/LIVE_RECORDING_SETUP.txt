@@ -6,6 +6,56 @@ and sends the recordings back so we can check the counts. First-time setup takes
 after that, a session is one command.
 
 
+0. STATUS: FROM LAPTOP TO PHONE (as of 2026-11-17)
+--------------------------------------------------
+Right now the phone is only a camera (through Camo). Everything runs on the laptop: pose, ball
+detection, tracking, metrics and the overlay. Moving to the phone means exporting the ball detector
+to Core ML and rewriting the code around the models in Swift. The pose model file is reused as is.
+
+Done
+[x] One per-frame function shared by replay, live and the future Swift app
+    (FramePipeline.step in src/pipeline.py)
+[x] Full-frame ball search runs only when needed (about 7% of frames), as on the phone
+[x] Ball detector exported to ONNX and timed on the laptop CPU; same detections as PyTorch
+    (scripts/bench_detector.py)
+[x] Core ML export script for a Mac (scripts/export_coreml.py), not run yet
+[x] Preprocessing spec the Swift app must match (docs/PREPROCESSING.md)
+[x] Portable test vectors so the Swift port can check itself (tests/vectors/)
+[x] Live demo on a laptop with a phone as the camera, with recording (src/live.py)
+[x] Live demo runs on a teammate's Mac with Camo; the overlay shows the phone's video
+
+Still to do
+Laptop (no Mac needed)
+[ ] Run the drills in this checklist and compare screen counts with hand counts
+[ ] Label, replay and score the live recordings
+[ ] evaluate.py support for live session summaries (output/live/*.json)
+[ ] Fix what the drills show, then the rule gaps (first touch from a still ball, missed crossings)
+[ ] Optional: check touch accuracy at 15 fps vs 30 fps on the labelled clips
+
+Mac
+[ ] Run the Core ML export (pip install coremltools; python -m scripts.export_coreml) and keep
+    models/*.mlpackage and output/coreml_check.json
+[ ] Install Xcode (about 10 GB); every step below needs it
+
+iPhone app (Mac + Xcode + iPhone)
+[ ] Camera + MediaPipe pose + live skeleton on a real iPhone; first real speed number
+[ ] A mode that replays recorded clips through the app, so it can be scored like Python
+[ ] Core ML ball detector on the foot crop; full-frame search mode
+[ ] Swift port of the logic, passing every test vector
+[ ] Same labelled clips through Python and the iPhone, with matching scores
+[ ] Live screen: tick-tocks by foot, pace, lost-control and head-down alerts
+[ ] Start/stop, 60 s sustained run on the oldest supported iPhone, slow down when hot
+[ ] Alignment screen, then session history
+
+Decisions still open
+[ ] Detector licence: YOLOv8n is AGPL, which conflicts with the App Store; YOLOX-nano (Apache)
+    is the default alternative (ask the advisor / tech transfer)
+[ ] What the live screen shows, given that tick-tocks confirm about 0.4 s late
+[ ] Lost-control rule: a still ball between wide-apart feet currently counts as lost control
+[ ] Who owns the iOS app, the detector, and the Swift port
+[ ] Detector fine-tuning: only if the drill results show the detector is a big share of errors
+
+
 1. BEFORE YOU START
 -------------------
 [ ] A Mac you can install software on (Apple Silicon is best)
