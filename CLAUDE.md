@@ -40,7 +40,7 @@ python -m src.label_clip data/clips/<tune|test>/<session>/<clip>.mp4
 python -m src.evaluate output/<clip>_stride1/report.json
 
 # Live feedback from a camera (phone-as-webcam apps show up as a camera); records to data/clips/live/
-python -m src.live                     # camera 0; --source 1 for another, --rotate 90, --flip
+python -m src.live                     # camera 0; START/STOP (or space) per drill, each recorded; --source 1, --rotate 90, --flip
 python -m src.live --source <clip>     # a clip played at its own pace, as if live
 
 # Portable test vectors for the Swift port (tests/vectors/): re-run after an intended logic or config change

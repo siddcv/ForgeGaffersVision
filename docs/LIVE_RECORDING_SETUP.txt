@@ -75,10 +75,11 @@ Decisions still open
         uv venv --python 3.12 ~/.venvs/gaffers-vision
     (then skip the python3.12 -m venv line below)
 
-[ ] Get the code on the realtimeOnEdge branch:
+[ ] Get the code on the develop branch (it has the head tracking):
         git clone https://github.com/siddcv/ForgeGaffersVision.git
         cd ForgeGaffersVision
-        git switch realtimeOnEdge
+        git switch develop
+    Already cloned? Run: git fetch, then git switch develop, then git pull
 
 [ ] Create and activate the environment, then install the packages:
         python3.12 -m venv ~/.venvs/gaffers-vision
@@ -87,7 +88,7 @@ Decisions still open
     requirements.txt was made on Windows. If one pinned version fails to install, install that
     package without the version (e.g. pip install mediapipe) and tell Siddharth which one it was.
 
-[ ] Run the tests (should all pass, about 170):
+[ ] Run the tests (should all pass, about 180):
         python -m pytest
 
 [ ] Open Camo on the phone and on the Mac and confirm the Mac shows the phone's camera.
@@ -115,7 +116,8 @@ Every later session: open a terminal, then
 
 [ ] First run only:
     - macOS asks for camera access for Terminal (or VS Code). Allow it, then run the command again.
-    - The models download and the ball detector is converted once; this takes a minute or two.
+    - The models (pose, face, ball) download and the ball detector is converted once; this takes
+      a minute or two and needs internet.
 
 [ ] Fix the picture if needed:
         --rotate 90        image is sideways (also 180 or 270)
@@ -123,12 +125,19 @@ Every later session: open a terminal, then
     Check left and right: tap only with the player's LEFT foot; the LEFT contact count should go up.
     If the right one goes up instead, add --flip.
 
-[ ] Keys in the window:
-        q or Esc           stop (the recording and summary are saved)
-        r                  reset the counts between drills
+[ ] The window opens in READY: the overlay runs but nothing is counted or recorded yet.
+    Use this time to place the phone and the player.
 
-[ ] Do 3-4 short drills of about 20 s each. Start one session per setup, so each recording has
-    one camera position.
+[ ] Each drill:
+        START button (or space)   3-second countdown, then counts reset and recording starts
+                                  (red REC and the drill time show top-right)
+        STOP button (or space)    ends the drill: its recording and summary are saved, and the
+                                  terminal prints where. Back to READY for the next drill.
+        q or Esc                  quit (a running drill is saved first)
+    Say the hand count out loud after each STOP and write it down with the drill's time.
+
+[ ] Do 3-4 short drills of about 20 s each, one START/STOP per drill. Each drill gets its own
+    recording, so each matches one hand count. Keep one camera position per set of drills.
 
 
 5. WHAT TO CHECK AND WRITE DOWN
@@ -151,7 +160,10 @@ Try each of these once, on purpose:
 [ ] Stop with the ball still between the feet for 2-3 s. Note whether it wrongly says lost control
     (known issue).
 [ ] A few double touches with the same foot. These should count as contacts, not tick-tocks.
-[ ] Look down at the ball for more than 1 s. Note whether head-down reacts (rough estimate only).
+[ ] Look down at the ball for more than 1 s. Note whether head-down reacts.
+    Head-down is not calibrated for this setup yet: it may show HEAD DOWN all the time. Write down
+    the pitch number when the player looks straight ahead and when they look at the ball; that is
+    what the calibration needs.
 
 How it feels:
 [ ] "contact" flashes right away; "TICK-TOCK" confirms about 0.4 s later. Is that OK or confusing?
@@ -161,10 +173,11 @@ How it feels:
 6. WHAT TO SEND BACK
 --------------------
 Recordings are saved in:
-        data/clips/live/<date>/live_<time>.mp4
-        data/clips/live/<date>/live_<time>.timestamps.csv     (real capture times; keep it with the .mp4)
+        data/clips/live/<date>/drill_<time>.mp4
+        data/clips/live/<date>/drill_<time>.timestamps.csv     (real capture times; keep it with the .mp4)
+    (.avi instead of .mp4 if this Mac cannot write .mp4; the terminal says which)
 Summaries and events are saved in:
-        output/live/live_<time>.json
+        output/live/drill_<time>.json
 
 [ ] Your notes from section 5, with the drill times
 [ ] One clean drill and one messy drill: each .mp4 AND its .timestamps.csv
@@ -184,6 +197,13 @@ Window opens but stays black, or the camera is refused
 
 pip install fails on one package
     Install that package without the version number and report which one.
+
+No recording saved after STOP
+    Read the terminal: it prints "Recording to ..." at START and "Saved ... and the recording ..."
+    at STOP. "Could not open a video writer" means this Mac's OpenCV cannot write video; send the
+    message to Siddharth and use --no-record meanwhile. Recordings are in data/clips/live/, which
+    git ignores, so they do not show up in git status (VS Code shows the folder greyed out).
+    Only drills between START and STOP are recorded; nothing is saved while the window says READY.
 
 Image is sideways or mirrored
     --rotate 90 / 180 / 270, and --flip. Recheck left/right with the left-foot-only test.

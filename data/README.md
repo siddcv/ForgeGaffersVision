@@ -11,7 +11,7 @@ data/
       <YYYY-MM-DD>_<place>/
     excluded/               # kept but not used: drill not performed properly (reason in manifest notes)
       <YYYY-MM-DD>_<place>/
-    live/                   # sessions recorded by src.live: live_<time>.mp4 + live_<time>.timestamps.csv
+    live/                   # drills recorded by src.live: drill_<time>.mp4 + drill_<time>.timestamps.csv
       <YYYY-MM-DD>/         # (real capture times). Move a useful one into tune/ or test/ with its sidecar
   labels/                   # hand-labelled ground truth (tracked in git)
     <clip>.csv              # same stem as the clip
