@@ -72,5 +72,14 @@ def ball_at(x, n_frames, start=0.0):
     ]
 
 
+def head_levels(cfg) -> tuple:
+    """(up, down, between) pitches for head tests, placed relative to the configured thresholds
+    so the tests check the head-down logic rather than one calibration of the pitch scale."""
+    up = cfg.head_up_pitch_deg + 10.0
+    down = cfg.head_down_pitch_deg - 10.0
+    between = (cfg.head_down_pitch_deg + cfg.head_up_pitch_deg) / 2  # hysteresis band
+    return up, down, between
+
+
 def head(pitches, fps=30):
     return [Observation(t_s=i / fps, head_pitch_deg=p) for i, p in enumerate(pitches)]

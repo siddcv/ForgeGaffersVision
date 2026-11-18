@@ -15,8 +15,8 @@
       "precision": 1.0,
       "recall": 0.9571428571428572,
       "f1": 0.9781021897810218,
-      "median_timing_error_ms": 33.344000000000484,
-      "mean_latency_ms": 469.1393134328361,
+      "median_timing_error_ms": 33.57799999999855,
+      "mean_latency_ms": 474.60941791044814,
       "missed_at_s": [
         0.5,
         14.492,
@@ -25,6 +25,21 @@
       "false_alarm_at_s": [],
       "foot_accuracy": 1.0,
       "wrong_foot_at_s": []
+    },
+    "head_down": {
+      "tolerance_s": 0.5,
+      "labelled": 8,
+      "detected": 8,
+      "hits": 8,
+      "misses": 0,
+      "false_alarms": 0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "median_timing_error_ms": 99.83900000000023,
+      "mean_latency_ms": 1016.0986249999996,
+      "missed_at_s": [],
+      "false_alarm_at_s": []
     }
   }
 }
