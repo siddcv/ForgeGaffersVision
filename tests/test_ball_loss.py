@@ -1,16 +1,7 @@
 """Synthetic tests for the frequency-disruption ball-loss detector."""
-import importlib.util
-from pathlib import Path
-
 import pytest
 
-_MODULE_PATH = Path(__file__).resolve().parents[1] / "src" / "ball-loss.py"
-_SPEC = importlib.util.spec_from_file_location("ball_loss", _MODULE_PATH)
-_BALL_LOSS = importlib.util.module_from_spec(_SPEC)
-_SPEC.loader.exec_module(_BALL_LOSS)
-BallLossConfig = _BALL_LOSS.BallLossConfig
-initial_state = _BALL_LOSS.initial_state
-step = _BALL_LOSS.step
+from src.ball_loss import BallLossConfig, initial_state, step
 
 # Steady tick-tock at 2 touches/s.
 STEADY_INTERVAL_S = 0.5
