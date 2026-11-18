@@ -88,7 +88,9 @@ def replay(cache, cfg: Config, stride: int = 1) -> list:
     def smooth_points(indices, points_at, t_s):
         smoothed = []
         for index in indices:
-            if points_at[index, 2] < cfg.pose_min_visibility:
+            # Written as "not >=" so NaN visibility (no person in frame) is skipped too;
+            # a NaN fed into a One Euro filter would make it output NaN forever.
+            if not points_at[index, 2] >= cfg.pose_min_visibility:
                 continue
             xy = []
             for axis in (0, 1):
