@@ -4,8 +4,13 @@
 data/
   manifest.csv              # one row per clip: setup and conditions (tracked in git)
   clips/                    # videos (gitignored)
-    <YYYY-MM-DD>_<place>/   # one folder per recording session
-      <phone filename>.mp4
+    tune/                   # clips used to choose thresholds
+      <YYYY-MM-DD>_<place>/ # one folder per recording session
+        <phone filename>.mp4
+    test/                   # held-out clips: scored once, at the end, never used to choose thresholds
+      <YYYY-MM-DD>_<place>/
+    excluded/               # kept but not used: drill not performed properly (reason in manifest notes)
+      <YYYY-MM-DD>_<place>/
   labels/                   # hand-labelled ground truth (tracked in git)
     <clip>.csv              # same stem as the clip
     TEMPLATE.csv
@@ -29,16 +34,35 @@ Add a row for every clip on the day it is recorded, while the setup is fresh. Le
 | `height_m`, `distance_m` | Phone lens height and distance to the player, in meters |
 | `angle_deg` | 0 = straight on |
 | `drill_start_s`, `drill_end_s` | Time of the clap, and when the drill ends (before anyone walks to the phone) |
-| `split` | `train` or `test`. Hold out whole clips, ideally a whole player, never single frames. |
+| `split` | `tune`, `test` or `excluded`, matching the clip's folder. Exclude a clip only for the recording itself (drill not done properly), never because the pipeline scores badly on it. Hold out whole clips, ideally a whole player, never single frames. Decide before looking at a clip's results; test clips should span the same mix of players and places as tune clips. |
 
 ## Labels
 One CSV per labelled clip, `labels/<clip>.csv`, with times in seconds from the start of the video:
 
 | `kind` | `t_s` | `end_s` | `foot` |
 |---|---|---|---|
-| `touch` | moment of contact | blank | `left` / `right` (the player's foot) |
+| `touch` | push-off: when the ball is clearly sent back (tick-tocks only) | blank | `left` / `right` (the player's foot) |
 | `lost_control` | ball escapes | ball back under control | blank |
 | `reset` | play restarts | blank | blank |
 | `head_down` | head goes down | head comes back up | blank |
 
 Label from the original video at full frame rate, stepping frame by frame around each touch.
+
+The easiest way is `python -m src.label_clip data/clips/<tune|test>/<session>/<clip>.mp4`, which stamps each key
+press with the frame's timestamp and saves `labels/<clip>.csv` after every change:
+
+| Key | Label |
+|---|---|
+| `l` / `r` | touch with the player's left / right foot (the player's own foot, not the screen side) |
+| `x` / `y` | lost control starts / control regained (`y` also writes the `reset` row) |
+| `h` / `u` | head down starts / head back up |
+| `e` / `z` | erase the nearest label / undo |
+| space, `,` `.`, `j` `k`, `[` `]` | play-pause, one frame back-forward, one second back-forward, slower-faster |
+
+Label in three passes, one kind of event at a time, all saving into the same `labels/<clip>.csv`:
+`--focus touches` (keys `l` `r`, starts at 0.25x), `--focus lost` (`x` `y`, 0.5x) and `--focus head`
+(`h` `u`, 0.5x). A pass ignores the other passes' keys and only erases its own labels; their labels
+stay dimmed on the timeline. Run one pass at a time per clip, since each pass rewrites the file.
+
+For touches, pause and step to the contact frame before pressing, rather than pressing while it plays.
+On quit it prints the touch gaps and interval durations, a first hint for the thresholds in `config.py`.

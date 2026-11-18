@@ -34,3 +34,11 @@ def test_head_down_label_follows_events():
     assert update_head_down(False, [down]) is True
     assert update_head_down(True, []) is True
     assert update_head_down(True, [up]) is False
+
+
+def test_touch_rate_text():
+    from src.metrics import TouchRate
+    from src.overlay import touch_rate_text
+    assert touch_rate_text(None, 150) == "goal 150/min"
+    assert touch_rate_text(TouchRate(12, False, None), 150) == "pace --  12 so far  goal 150"
+    assert touch_rate_text(TouchRate(151, True, 148.4), 150) == "pace 148/min  last min 151  goal 150"

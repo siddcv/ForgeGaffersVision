@@ -88,7 +88,9 @@ def replay(cache, cfg: Config, stride: int = 1) -> list:
     def smooth_points(indices, points_at, t_s):
         smoothed = []
         for index in indices:
-            if points_at[index, 2] < cfg.pose_min_visibility:
+            # Written as "not >=" so a frame with no pose (NaN) is skipped too: one NaN fed to a
+            # One Euro filter stays in its state and turns every later foot position into NaN.
+            if not points_at[index, 2] >= cfg.pose_min_visibility:
                 continue
             xy = []
             for axis in (0, 1):
@@ -130,8 +132,32 @@ def replay(cache, cfg: Config, stride: int = 1) -> list:
         records.append({
             "index": i, "t_s": t_s, "crop": crop, "ball": detection, "ball_xy": ball_xy,
             "predicted": predicted, "searched_full_frame": searched, "events": events,
+            "touch_rate": metrics.touch_rate(state, t_s, cfg),
         })
     return records
+
+
+def touches_per_minute_summary(records: list, touches: list, cfg: Config) -> dict:
+    """Average rate over the drill, best full minute, and the goal.
+
+    The drill is taken as first to last touch, since warm-up and walking to the phone
+    have no touches. best_minute stays None on a drill shorter than a minute.
+    """
+    times = sorted(e.t_s for e in touches)
+    span_s = times[-1] - times[0] if len(times) > 1 else 0.0
+    rates = [r["touch_rate"] for r in records if r.get("touch_rate")]
+    full = [r.last_minute for r in rates if r.minute_complete]
+    paces = [r.pace_per_min for r in rates if r.pace_per_min is not None]
+    best = max(full) if full else None
+    return {
+        "goal": cfg.touches_per_minute_goal,
+        "touches": len(times),
+        "drill_s": round(span_s, 2),
+        "average": round((len(times) - 1) / span_s * 60, 1) if span_s else None,
+        "best_minute": best,
+        "peak_pace": round(max(paces), 1) if paces else None,
+        "goal_met": None if best is None else best >= cfg.touches_per_minute_goal,
+    }
 
 
 def summarize(records: list, cache, cfg: Config) -> dict:
@@ -156,11 +182,16 @@ def summarize(records: list, cache, cfg: Config) -> dict:
         "low_foot_visibility_pct": float(100 * np.mean(~(visibility >= cfg.pose_min_visibility))),
         "ball_found_pct": 100 * float(np.mean([r["ball"] is not None for r in records])),
         "ball_tracked_pct": 100 * float(np.mean([r["ball_xy"] is not None for r in records])),
-        "searching_pct": 100 * float(np.mean([r["searched_full_frame"] for r in records])),
+        "searching_pct": 100 * float(np.mean([r["searched_full_frame"] for r in records])),        # Tick-tocks: contacts that sent the ball across to the other foot.
         "touches": {
             "left": sum(e.foot == "left" for e in touches),
             "right": sum(e.foot == "right" for e in touches),
         },
+        # Every touch on the ball, including setup and recovery taps and same-foot repeats.
+        "contacts": {
+            foot: sum(e.kind == "contact" and e.foot == foot for e in events) for foot in ("left", "right")
+        },
+        "touches_per_minute": touches_per_minute_summary(records, touches, cfg),
         "mean_speed_mps": {
             foot: float(np.mean(values)) if values else None for foot, values in speeds.items()
         },
