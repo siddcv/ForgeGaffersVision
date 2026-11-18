@@ -11,8 +11,8 @@ CFG = Config(
     ball_loss_baseline_s=4.0,
     ball_loss_drop_frac=0.3,
     ball_loss_dip_min_s=0.4,
-    ball_loss_dip_max_s=2.5,
     ball_loss_min_baseline_intervals=4,
+    ball_loss_pace_change_gaps=3,
 )
 
 
@@ -52,7 +52,7 @@ def test_brief_gap_then_recover_is_ball_loss():
     events = run(before + after)
     losses = [e for e in events if e.kind == "ball-loss"]
     assert len(losses) == 1
-    assert 0.4 <= losses[0].value <= 2.5
+    assert losses[0].value == pytest.approx(1.2)
 
 
 def test_sustained_slowdown_is_not_ball_loss():
@@ -120,3 +120,59 @@ def test_interrupt_clears_a_pending_loss():
     state, _ = feed(initial_state(), steady_touches(5.0) + [6.2])  # late gap, awaiting confirmation
     state, events = feed(interrupt(state), [6.7, 7.2])
     assert events == []
+
+
+# Bug 2 (clip 20261102_135033): long gaps used to switch the detector off, because a gap over
+# 2.5 s was never a loss and replaced the baseline, which then never came back down.
+
+
+def test_long_gap_then_recover_is_ball_loss():
+    before = steady_touches(5.0)
+    after = [8.5, 9.0, 9.5, 10.0]  # 3.5 s with no touches, then back to pace
+    losses = [e for e in run(before + after) if e.kind == "ball-loss"]
+    assert len(losses) == 1
+    assert losses[0].value == pytest.approx(3.5)
+
+
+def test_one_long_gap_does_not_raise_the_baseline():
+    # Classroom pattern: steady ~0.4 s, a 3.4 s gap, steady again, then a 1.0 s fumble.
+    before = steady_touches(5.0, interval_s=0.4)
+    middle = [round(8.2 + i * 0.4, 6) for i in range(8)]  # last steady touch 4.8; ends at 11.0
+    after = [12.0, 12.4, 12.8, 13.2]
+    losses = [e for e in run(before + middle + after) if e.kind == "ball-loss"]
+    assert [round(e.value, 1) for e in losses] == [3.4, 1.0]
+
+
+def test_long_gap_during_warmup_does_not_inflate_the_baseline():
+    early = steady_touches(3.0, interval_s=0.4)  # last touch 2.8
+    middle = [round(5.5 + i * 0.4, 6) for i in range(10)]  # 2.7 s gap, steady to 9.1
+    after = [10.1, 10.5, 10.9, 11.3]  # 1.0 s fumble
+    losses = [e for e in run(early + middle + after) if e.kind == "ball-loss"]
+    assert any(e.value == pytest.approx(1.0) for e in losses)
+
+
+def test_baseline_comes_back_down_when_play_speeds_up():
+    slow = steady_touches(5.0, interval_s=1.0)  # baseline learned at 1 touch/s
+    fast = [round(5.5 + i * 0.5, 6) for i in range(16)]  # sustained 2 touches/s, ends at 13.0
+    after = [14.0, 14.5, 15.0, 15.5]  # 1.0 s gap: late at the new pace
+    losses = [e for e in run(slow + fast + after) if e.kind == "ball-loss"]
+    assert len(losses) == 1
+    assert losses[0].value == pytest.approx(1.0)
+
+
+def test_slightly_late_gap_does_not_hide_the_fumble_after_it():
+    # Park clip at 19.8 s: a gap just over the late cut-off, then a real fumble, then normal pace.
+    # Two late gaps in a row are not yet a pace change; the newest one is judged.
+    before = steady_touches(5.0, interval_s=0.4)  # last touch 4.8, cut-off ~0.57 s
+    after = [5.4, 6.8, 7.2, 7.6, 8.0]  # 0.6 s (barely late), 1.4 s (fumble), then back to pace
+    losses = [e for e in run(before + after) if e.kind == "ball-loss"]
+    assert len(losses) == 1
+    assert losses[0].value == pytest.approx(1.4)
+    assert losses[0].t_s == pytest.approx(5.4)
+
+
+def test_three_late_gaps_in_a_row_is_a_pace_change_not_a_loss():
+    before = steady_touches(5.0)
+    slower = [5.8, 6.6, 7.4]  # three 0.8 s gaps (cut-off ~0.71 s)
+    after = [7.9, 8.4, 8.9]
+    assert run(before + slower + after) == []
