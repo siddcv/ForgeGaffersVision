@@ -1,7 +1,7 @@
 """Synthetic tests for the frequency-disruption ball-loss detector."""
 import pytest
 
-from src.ball_loss import initial_state, step
+from src.ball_loss import initial_state, interrupt, step
 from src.config import Config
 
 # Steady tick-tock at 2 touches/s.
@@ -97,3 +97,26 @@ def test_ball_loss_times_gap_start_and_confirming_report():
     assert losses[0].t_s == pytest.approx(5.0)
     assert losses[0].value == pytest.approx(1.2)
     assert losses[0].reported_t_s == pytest.approx(6.7 + 0.1)
+
+
+def feed(state, times):
+    events = []
+    for t in times:
+        state, new_events = step(state, t, t, CFG)
+        events += new_events
+    return state, events
+
+
+def test_interrupt_drops_the_gap_across_it_but_keeps_the_baseline():
+    state, _ = feed(initial_state(), steady_touches(5.0))
+    baseline = state.baseline_interval_s
+    state = interrupt(state)  # e.g. the spatial detector saw the ball escape at ~5.3 s
+    state, events = feed(state, [6.2, 6.7, 7.2, 7.7])
+    assert events == []
+    assert state.baseline_interval_s == baseline
+
+
+def test_interrupt_clears_a_pending_loss():
+    state, _ = feed(initial_state(), steady_touches(5.0) + [6.2])  # late gap, awaiting confirmation
+    state, events = feed(interrupt(state), [6.7, 7.2])
+    assert events == []

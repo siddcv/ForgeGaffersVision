@@ -35,6 +35,15 @@ def initial_state() -> BallLossState:
     return BallLossState()
 
 
+def interrupt(state: BallLossState) -> BallLossState:
+    """Forget the last touch and any pending loss; keep the learned baseline.
+
+    Called when another detector has already reported this incident, so the gap
+    spanning it is never judged and the incident is not reported twice.
+    """
+    return replace(state, last_touch_t_s=None, pending_loss_t_s=None, pending_gap_s=None)
+
+
 def _mean(values: tuple) -> float | None:
     if not values:
         return None

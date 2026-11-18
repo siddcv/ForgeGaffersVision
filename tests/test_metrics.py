@@ -4,7 +4,9 @@ import pytest
 
 from src.config import Config
 from src.metrics import Observation, initial_state, step
-from tests.synth import DIAMETER_PX, LEFT_FOOT, RIGHT_FOOT, Y, synth_tick_tock
+from tests.synth import (
+    DIAMETER_PX, LEFT_FOOT, RIGHT_FOOT, Y, synth_tick_tock, with_ball_away, with_hold,
+)
 
 CFG = Config()
 
@@ -128,6 +130,31 @@ def test_far_ball_is_lost_control_then_reset_when_it_returns():
 
 def test_normal_play_has_no_lost_control():
     assert kinds(run(synth_tick_tock(20)), "lost_control") == []
+
+
+def test_spatial_lost_control_is_marked_spatial():
+    events = run(ball_at(1000.0, 30) + ball_at(240.0, 3, start=1.0))
+    assert [e.source for e in kinds(events, "lost_control")] == ["spatial"]
+
+
+# Rhythm: synth touches come every ~0.44 s, so the baseline locks after ~4 s of play.
+def test_long_steady_play_has_no_rhythm_loss():
+    assert kinds(run(synth_tick_tock(40)), "lost_control") == []
+
+
+def test_one_late_touch_then_normal_pace_is_rhythm_lost_control():
+    events = run(with_hold(synth_tick_tock(30), at_s=7.0, hold_s=0.5))
+    lost = kinds(events, "lost_control")
+    assert [e.source for e in lost] == ["rhythm"]
+    assert lost[0].t_s < 7.0 < lost[0].t_s + lost[0].value
+    assert lost[0].reported_t_s > lost[0].t_s + lost[0].value  # confirmed by the next touch
+
+
+def test_spatial_loss_is_not_also_reported_as_rhythm_loss():
+    # The ball gets away for 1 s mid-drill: one incident, reported once.
+    events = run(with_ball_away(synth_tick_tock(30), at_s=7.0, away_s=1.0))
+    assert [e.source for e in kinds(events, "lost_control")] == ["spatial"]
+    assert len(kinds(events, "reset")) == 1
 
 
 def head(pitches, fps=30):

@@ -1,4 +1,6 @@
 """Synthetic tick-tock generator, so metric tests have known answers."""
+from dataclasses import replace
+
 from src.metrics import Observation
 
 LEFT_X, RIGHT_X = 200.0, 400.0  # image positions of the feet
@@ -32,3 +34,39 @@ def synth_tick_tock(n_touches: int, fps: float = 30.0, speed_mps: float = 1.5) -
             left_foot=LEFT_FOOT, right_foot=RIGHT_FOOT, head_pitch_deg=0.0,
         ))
     return observations
+
+
+def insert_frames(observations: list, at_s: float, inserted_xy: list, fps: float = 30.0) -> list:
+    """Splice extra frames in at time at_s and shift everything after them later.
+
+    inserted_xy holds one ball position per inserted frame (None for a frame with no ball).
+    """
+    i = next(k for k, o in enumerate(observations) if o.t_s >= at_s)
+    base = observations[i - 1]
+    shift = len(inserted_xy) / fps
+    inserted = [
+        replace(base, t_s=base.t_s + (k + 1) / fps, ball_xy=xy,
+                ball_diameter_px=DIAMETER_PX if xy is not None else None)
+        for k, xy in enumerate(inserted_xy)
+    ]
+    later = [replace(o, t_s=o.t_s + shift) for o in observations[i:]]
+    return observations[:i] + inserted + later
+
+
+def with_hold(observations: list, at_s: float, hold_s: float, fps: float = 30.0) -> list:
+    """At the first turnaround from at_s, the ball sits at the foot for hold_s.
+
+    Gives one late touch, then normal pace, with the ball never far from the feet.
+    """
+    def at_turnaround(o):
+        return min(abs(o.ball_xy[0] - BALL_MIN_X), abs(o.ball_xy[0] - BALL_MAX_X)) <= 10.0
+
+    i = next(k for k, o in enumerate(observations) if o.t_s >= at_s and at_turnaround(o))
+    xy = observations[i].ball_xy
+    return insert_frames(observations, observations[i + 1].t_s, [xy] * round(hold_s * fps), fps)
+
+
+def with_ball_away(observations: list, at_s: float, away_s: float, fps: float = 30.0) -> list:
+    """The ball escapes far from both feet for away_s, then play carries on."""
+    far_xy = ((LEFT_X + RIGHT_X) / 2, Y + 400.0)
+    return insert_frames(observations, at_s, [far_xy] * round(away_s * fps), fps)

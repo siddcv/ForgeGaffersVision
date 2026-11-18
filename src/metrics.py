@@ -1,10 +1,13 @@
 """Streaming tick-tock metrics. Standard library only, and never reads future frames.
 
 Call step(state, observation, cfg) once per frame. cfg is any object with the
-threshold fields of config.Config, passed in so this module imports nothing else.
+threshold fields of config.Config, passed in so this module imports nothing but
+the standard library and ball_loss (also standard library only).
 """
 import math
 from dataclasses import dataclass, replace
+
+from . import ball_loss
 
 
 @dataclass(frozen=True)
@@ -25,6 +28,7 @@ class Event:
     reported_t_s: float  # when the system knew; the difference is detection latency
     foot: str | None = None
     value: float | None = None
+    source: str | None = None  # lost_control only: "spatial" (ball away / not found) or "rhythm" (touch pace)
 
 
 @dataclass(frozen=True)
@@ -44,6 +48,7 @@ class State:
     not_found_since_s: float | None = None
     head_low_since_s: float | None = None
     head_down_since_s: float | None = None
+    rhythm: ball_loss.BallLossState = ball_loss.BallLossState()  # touch-pace ball-loss detector
 
 
 def initial_state() -> State:
@@ -161,7 +166,7 @@ def _step_lost_control(state: State, obs: Observation, distances: tuple, cfg) ->
         since = state.not_found_since_s if state.not_found_since_s is not None else obs.t_s
         state = replace(state, not_found_since_s=since, far_since_s=None)
         if not state.lost and obs.t_s - since >= cfg.lost_control_min_s:
-            return replace(state, lost=True), [Event("lost_control", since, obs.t_s)]
+            return replace(state, lost=True), [Event("lost_control", since, obs.t_s, source="spatial")]
         return state, []
 
     state = replace(state, not_found_since_s=None)
@@ -179,7 +184,7 @@ def _step_lost_control(state: State, obs: Observation, distances: tuple, cfg) ->
     since = state.far_since_s if state.far_since_s is not None else obs.t_s
     state = replace(state, far_since_s=since)
     if obs.t_s - since >= cfg.lost_control_min_s:
-        return replace(state, lost=True), [Event("lost_control", since, obs.t_s)]
+        return replace(state, lost=True), [Event("lost_control", since, obs.t_s, source="spatial")]
     return state, []
 
 
@@ -204,6 +209,25 @@ def _step_head(state: State, obs: Observation, cfg) -> tuple:
     return state, []
 
 
+def _step_rhythm(state: State, events: list, cfg) -> tuple:
+    """Feed this frame's touches to the rhythm detector; report its losses as lost_control.
+
+    A spatial lost_control or reset this frame interrupts it first, so the touch gap
+    across a spatial incident is never judged and one incident is reported once.
+    """
+    rhythm = state.rhythm
+    if any(e.kind in ("lost_control", "reset") for e in events):
+        rhythm = ball_loss.interrupt(rhythm)
+    new_events = []
+    for touch in (e for e in events if e.kind == "touch"):
+        rhythm, losses = ball_loss.step(rhythm, touch.t_s, touch.reported_t_s, cfg)
+        new_events += [
+            Event("lost_control", loss.t_s, loss.reported_t_s, value=loss.value, source="rhythm")
+            for loss in losses
+        ]
+    return replace(state, rhythm=rhythm), new_events
+
+
 def step(state: State, obs: Observation, cfg) -> tuple:
     """Advance one frame. Returns (new_state, events)."""
     events = []
@@ -217,6 +241,8 @@ def step(state: State, obs: Observation, cfg) -> tuple:
         state, new_events = _step_ball(state, obs, distances, cfg)
         events += new_events
     state, new_events = _step_lost_control(state, obs, distances, cfg)
+    events += new_events
+    state, new_events = _step_rhythm(state, events, cfg)
     events += new_events
     state, new_events = _step_head(state, obs, cfg)
     events += new_events

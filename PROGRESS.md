@@ -20,13 +20,14 @@ Ideas to explore:
   - Emits `ball-loss` only when a late gap is followed by a return to near-baseline pace (recovery confirmation).
   - Another late gap instead of recovery updates the baseline (pace change); speed-ups never count as a loss.
   - Called once per touch: `step(state, touch_t_s, reported_t_s, cfg)`. Gaps use touch time; `reported_t_s` only stamps the event so latency is measurable.
-  - Thresholds are `ball_loss_*` fields on `Config` in `src/config.py`; own `BallLossState` / `BallLossEvent`; not wired into `metrics.step` yet.
-- Synthetic coverage in `tests/test_ball_loss.py` (steady play, brief gap, sustained slowdown, speed-up, pre-baseline gap, 30/60 fps, uneven report delay, event timestamps).
+  - Thresholds are `ball_loss_*` fields on `Config` in `src/config.py`.
+  - Wired into `metrics.step` (`_step_rhythm`): each touch event is fed in, and a loss comes out as `lost_control` with `source="rhythm"` (spatial ones have `source="spatial"`). A spatial `lost_control` or `reset` calls `ball_loss.interrupt`, which drops the last touch and any pending loss but keeps the baseline, so one incident is reported once.
+- Synthetic coverage in `tests/test_ball_loss.py` (steady play, brief gap, sustained slowdown, speed-up, pre-baseline gap, 30/60 fps, uneven report delay, event timestamps, interrupt) and end-to-end in `tests/test_metrics.py` (long steady play, one late touch, ball escaping not double-reported), using `with_hold` / `with_ball_away` in `tests/synth.py`.
 
 # To-do
-- Wire `ball_loss.step` into `metrics.step` (or `run_clip`) after each touch / frame, using real touch events.
+- ~~Wire `ball_loss.step` into `metrics.step` (or `run_clip`) after each touch / frame, using real touch events.~~ Done (roadmap step 4).
 - ~~Move `BallLossConfig` fields into `src/config.py` and pass them through like other thresholds.~~ Done (roadmap step 1).
-- Map `ball-loss` events to the existing `lost_control` label kind (or document a subtype) and de-dupe with spatial lost-control when both fire.
+- ~~Map `ball-loss` events to the existing `lost_control` label kind (or document a subtype) and de-dupe with spatial lost-control when both fire.~~ Done (roadmap steps 3-4).
 - Tune thresholds on labelled `lost-in-frame`, `lost-out-of-frame`, `baseline`, and `slow-fast` clips.
 - Decide whether to keep combined rate only or add per-foot baselines.
 - Optional later: dynamic baseline from an initial screen bounding box; offline every-Nth-frame analysis notebooks only.
@@ -43,7 +44,7 @@ Steps in order; the to-do items above map onto them.
   - **Decided - de-dupe:** one incident is reported once. Suppress a rhythm loss whose gap overlaps a spatial `lost_control`/`reset` episode, and clear the rhythm detector's pending state after a `reset` so the gap across a spatial loss is never judged.
   - **Decided - strictness:** keep `drop_frac=0.3` as is. An uneven touch is the wrong rhythm and should be flagged, even if that also flags some touches the touch detector failed to see.
     - *Revisit later:* if false losses from undetected touches show up on real clips (step 8), go easier on the player and stricter on the software: require a larger gap (~2.5x baseline) or a ball-position cue (ball moved away from the feet) before reporting.
-- [ ] **4. Wire into `metrics.step`.** Nest the ball-loss state in `metrics.State`, feed it touch events from `_step_ball`, apply the de-dupe rule. Integration tests in `test_metrics.py` with `tests/synth.py`: steady -> none, one long gap -> one loss, spatial loss -> no duplicate.
+- [x] **4. Wire into `metrics.step`.** Nest the ball-loss state in `metrics.State`, feed it touch events from `_step_ball`, apply the de-dupe rule. Integration tests in `test_metrics.py` with `tests/synth.py`: steady -> none, one long gap -> one loss, spatial loss -> no duplicate.
 - [ ] **5. Surface in `run_clip`.** Count the new events in `summarize()` / `report.json`; optional overlay marker.
 - [ ] **6. Ground truth.** Get the two manifest clips into `data/clips/`; label touches and `lost_control` for at least `20261101_183403` (likely loss ~8.2-10.6 s). Record `lost-in-frame`, `lost-out-of-frame`, `slow-fast`, `repeat-touches` takes.
 - [ ] **7. Evaluation script.** Small `evaluate.py` matching predicted events to labels within a time tolerance: precision, recall, latency. Also serves touch metrics.
