@@ -42,6 +42,7 @@ python -m src.evaluate output/<clip>_stride1/report.json
 # Live feedback from a camera (phone-as-webcam apps show up as a camera); records to data/clips/live/
 python -m src.live                     # camera 0; START/STOP (or space) per drill; saves the raw video + overlay video; --source 1, --rotate 90, --flip
 python -m src.live --source <clip>     # a clip played at its own pace, as if live
+python -m src.evaluate_live output/live/drill_<time>.json   # score a live drill vs a full-rate replay of its recording
 
 # Portable test vectors for the Swift port (tests/vectors/): re-run after an intended logic or config change
 python -m scripts.export_test_vectors
