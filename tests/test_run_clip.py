@@ -38,3 +38,11 @@ def test_feet_recover_after_clip_starts_with_no_person(monkeypatch):
     for obs in seen[10:]:
         assert len(obs.left_foot) == 2 and len(obs.right_foot) == 2
         assert all(math.isfinite(v) for point in obs.left_foot + obs.right_foot for v in point)
+
+
+def test_summarize_counts_lost_control_by_source():
+    cache = _cache_with_person_missing_first(n_frames=40, missing=10)
+    summary = rc.summarize(rc.replay(cache, Config()), cache, Config())
+    by_source = summary["lost_control_by_source"]
+    assert set(by_source) == {"spatial", "rhythm"}
+    assert sum(by_source.values()) == summary["lost_control"]

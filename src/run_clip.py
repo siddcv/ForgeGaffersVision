@@ -13,6 +13,7 @@ import numpy as np
 from . import ball as ball_module
 from .config import Config
 from .face_pose import open_head_pitch_sampler
+from .metrics import count_lost_control
 from .pipeline import POSE_PITCH, FramePipeline
 from .pose import LEFT_FOOT, RIGHT_FOOT, PoseEstimator, visible_points
 from .video_io import iter_frames, read_timestamps
@@ -171,7 +172,7 @@ def summarize(records: list, cache, cfg: Config) -> dict:
             foot: float(np.mean(values)) if values else None for foot, values in speeds.items()
         },
         "lost_control": sum(e.kind == "lost_control" for e in events),
-        "lost_control_by_source": metrics.count_lost_control(events),
+        "lost_control_by_source": count_lost_control(events),
         "resets": sum(e.kind == "reset" for e in events),
         "head_down": sum(e.kind == "head_down" for e in events),
         "head_pose_valid_pct": (
