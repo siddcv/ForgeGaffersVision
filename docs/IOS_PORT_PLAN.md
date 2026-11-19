@@ -1,11 +1,29 @@
 # iPhone Port Plan
 
-**Status:** Plan. Phase 0 can start now on Windows; Phase 2 onward needs a Mac.
+**Status (2026-11-19):** Phase 0 nearly done, Phase 1 finishing with the first real drills, and
+the core of Phase 4 (the Swift logic, passing every test vector) done early. Phase 2, the first
+iPhone app, is next and needs a Mac with Xcode.
 **Decision:** iPhone first (native Swift, Core ML). Android comes later, if at all.
 
 This plan turns the Python prototype in `src/` into a live, fully offline iPhone app. It builds on
 `MOBILE_PLAN.md` (platform options and iOS design notes) and `FINE_TUNING.md` (ball detector data).
 Where those documents and this one disagree, this one is newer.
+
+## Progress at a glance
+
+| Phase | Status | What exists |
+|---|---|---|
+| 0. Prep on Windows | Nearly done | Shared per-frame function, preprocessing spec, test vectors, ONNX export + benchmark, Core ML export script. Open: detector licence, rule gaps |
+| 1. Laptop live demo | Finishing | `src/live.py` with a phone as webcam (Camo), START/STOP per drill, raw + overlay recording, camera report, manifest rows, `src/evaluate_live.py` scoring. Open: first real drills |
+| 2. iOS spike | Not started | Needs a Mac with Xcode |
+| 3. Ball detector on device | Not started | `scripts/export_coreml.py` ready to run on a Mac |
+| 4. Port the logic | Core done | `swift/GaffersVisionCore`: Swift port of the per-frame logic, passing all 28 test vectors. Open: on-device parity test |
+| 5. Product | Not started | START/STOP and countdown exist in the laptop demo, to copy |
+
+The phone app is a native iOS app, built and installed from Xcode. For testing it is a one-screen
+developer app (camera, models, overlay, count, START/STOP), installed over a cable with a free
+Apple ID; no App Store. The counting logic is already in the Swift package; the app runs the
+camera and the models and draws the results.
 
 ## Decisions
 
@@ -66,6 +84,22 @@ families, **not yet measured on our models**:
 Models total about 12 MB. A 60 s drill is too short for heavy thermal throttling. The plain-code
 logic costs essentially nothing; the two neural networks are the whole budget.
 
+### Frame rate matters for touch counting
+The touch rules need frames close together, so on-device speed is not optional. Replaying all 9
+labelled tune clips (516 tick-tocks) at lower frame rates, with `touch_max_gap_s` at 0.4 s:
+
+| Frames processed | Tick-tock recall | False alarms |
+|---|---|---|
+| 60 fps | 90.3% | 23 |
+| 30 fps | 89.5% | 21 |
+| 15 fps | 86.4% | 19 |
+| 8.6 fps | 70.7% | 17 |
+
+Before `touch_max_gap_s` went from 0.25 to 0.4 s, 15 fps gave 74% and 8.6 fps 55%. The laptop
+demo processed 8.4 fps when a 60 fps clip was played live with Face Landmarker on (live recall 57%
+vs 99% for the full-rate replay of the same clip, `src/evaluate_live.py`), so laptop live counts
+undercount; judge accuracy from replays. **The phone must hold close to 30 fps.**
+
 ## Known issues the port must handle
 
 | Issue | Fix |
@@ -77,6 +111,9 @@ logic costs essentially nothing; the two neural networks are the whole budget.
 | MediaPipe swaps the feet on some clips (night, narrow stance) | A model problem, not a platform one; it follows the app to iOS. Track separately. |
 | The cache step runs both detectors every frame | Dev only. Live code runs the full frame only while searching, as `search_step` already assumes. |
 | INT8 quantization can drop low-confidence detections | Stay at 16-bit until the fine-tuned detector's INT8 recall is checked on cached crops. |
+| Head-down thresholds (17 / 22 deg Face Landmarker pitch) come from one clip; on 20261102_134206 pitch never rose above 20.5 deg, so head-down showed for the whole clip | Calibrate per player or per setup (e.g. relative to the player's upright pitch at the start of a drill). Teammate-owned; needs pitch readings from more setups. |
+| Foot attribution: the "direction" rule credits the foot the ball moved toward even when that foot is far away (false tick-tock at 29.13 s on 20261102_134206) | Use the direction foot only if it is within touch distance, else the nearest foot. Fix in Python, score on all tune clips, regenerate vectors, update Swift. |
+| Phone-as-webcam apps send landscape video, which pushes the phone back and shrinks the ball | Laptop demo only: Camo portrait setting or `--rotate`. The iPhone app captures portrait directly. |
 
 ## Phases
 
@@ -86,25 +123,42 @@ logic costs essentially nothing; the two neural networks are the whole budget.
        `ball.needs_full_frame` says so (6.7% of frames across the cached clips).
 2. [x] **Preprocessing spec** (`docs/PREPROCESSING.md`): input sizes, crop rules, padding, channel
        order, normalization. The Swift version must match it exactly.
-3. [ ] **Detector choice:** check the licence, and convert each candidate to Core ML in WSL
-       (`coremltools` does not run natively on Windows; conversion works in WSL, running and profiling
-       need a Mac). Then run the fine-tuning pilot in `FINE_TUNING.md`.
+3. [ ] **Detector choice:** ONNX export done and checked (same detections as PyTorch);
+       `scripts/export_coreml.py` is ready but has not been run on a Mac yet (it does not need
+       Xcode, only Python + `coremltools`). Still open: the licence answer (YOLOv8n vs YOLOX-nano).
+       Fine-tuning waits until the drill results show the detector is a big share of errors.
 4. [x] **Portable test vectors** (`tests/vectors/`, see its README): 25 metric scenarios, the
-       filters, the search switch, and 10 s of a real clip through `FramePipeline.step`.
-5. [ ] **Fix the rule gaps while they are cheap in Python:** starting from rest (TODO in
-       `metrics.py`), crossings not seen between contacts, the drill window, and the tick-tock delay.
+       filters, the search switch, and 10 s of a real clip through `FramePipeline.step`, with
+       Face Landmarker pitch as an input. Regenerated after each intended logic change.
+5. [ ] **Fix the rule gaps while they are cheap in Python:**
+       - [x] Frame-rate robustness: `touch_max_gap_s` 0.25 -> 0.4 s (see Feasibility).
+       - [x] Drill window: START/STOP per drill, and each recorded drill writes its own manifest row.
+       - [ ] Foot attribution far from the ball (Known issues).
+       - [ ] Starting from rest (TODO in `metrics.py`; the miss at 1.42 s on 20261102_134206).
+       - [ ] The tick-tock delay on screen (~0.4 s): decide what the live screen shows.
 
-### Phase 1: thin laptop live demo (a few days)
-- [x] `src/live.py`: camera -> the shared per-frame function -> live overlay window; records the
-      raw video and a timestamps sidecar so live sessions can be labelled and replayed. On the
-      laptop (1080p clip played live, 2 detector threads): ~71 ms per frame, ~78 ms feedback lag,
-      so ~14 fps processed; the newest frame is always taken and the rest are skipped.
-- [ ] Use the phone as a webcam (Camo, DroidCam or Iriun) placed low and in front, like the clips.
-- [ ] Goals: feel the tick-tock delay live and try camera placement for the alignment screen.
-      Not performance.
+### Phase 1: thin laptop live demo
+- [x] `src/live.py`: camera -> the shared per-frame function -> live overlay window. On the laptop
+      (1080p clip played live, 2 detector threads, before Face Landmarker): ~71 ms per frame.
+- [x] Phone as a webcam: runs on a teammate's Mac with Camo.
+- [x] Head tracking live: Face Landmarker pitch at 10 Hz, shared with replay (`HeadPitchSampler`).
+- [x] START / STOP per drill (button or space, 3 s countdown); each drill saves its raw video,
+      a timestamps sidecar, the overlay video as shown, a summary and a manifest row.
+- [x] Camera report at start (size, orientation, delivered fps; landscape warning).
+- [x] `src/evaluate_live.py`: scores a live drill next to a full-rate replay of its recording and
+      sorts every error into both / live only / replay only.
+- [ ] First real drills: hand count vs screen, camera placement, how the tick-tock delay feels,
+      then label and score them.
 
 ### Phase 2: iOS spike (Mac + iPhone)
-- [ ] Xcode app: AVFoundation at 720p / 30 fps -> MediaPipe Pose -> skeleton overlay.
+Before writing any app code, two numbers on a real iPhone:
+- [ ] Ball detector speed: open the exported `.mlpackage` in Xcode, connect the iPhone, Performance tab.
+- [ ] Pose speed: build Google's MediaPipe Pose Landmarker iOS sample app (mediapipe-samples on
+      GitHub) onto the iPhone.
+
+Then the developer test app:
+- [ ] Xcode app: AVFoundation, portrait, 30 fps -> MediaPipe Pose -> skeleton overlay, with
+      `swift/GaffersVisionCore` added as a local Swift package.
 - [ ] Measure the frame rate on the oldest supported iPhone: the first real feasibility number.
 - [ ] **Clip-input mode next to camera mode** (AVAssetReader feeding the same pipeline). It mirrors the
       Python replay, so labelled clips run on the phone and are scored with `evaluate.py`. This is the
@@ -119,15 +173,19 @@ logic costs essentially nothing; the two neural networks are the whole budget.
       layers that fall back to the CPU.
 
 ### Phase 4: port the logic
-- [ ] Swift versions of `filters.py` (Kalman, One Euro), `search_step`, `BallTracker` and
-      `metrics.py`, using plain value types, all thresholds from one config struct.
-- [ ] Pass the JSON test vectors.
+- [x] Swift versions of `metrics.py`, `filters.py` (Kalman, One Euro), the search switch,
+      `BallTracker`, the foot crop and `FramePipeline.step`, with plain value types and all
+      thresholds in one `Config` struct: `swift/GaffersVisionCore` (Swift + Foundation only).
+- [x] Pass the JSON test vectors: `swift test` passes all 28 (Windows, Swift 6.4.2). A deliberate
+      bug (feet swapped) gave 281 failures, so the vectors catch mistakes. Python stays the
+      reference: change Python, regenerate the vectors, update Swift until they pass.
 - [ ] **Parity test:** the same labelled clips through Python and the iPhone, with matching events
       and matching `evaluate.py` scores.
 
 ### Phase 5: product
 - [ ] Live screen: tick-tock count by foot, pace, head-down and lost-control alerts; contacts shown instantly.
 - [ ] Explicit start (countdown) and stop, which also removes setup taps and after-drill taps.
+      (Built in the laptop demo; copy its behaviour.)
 - [ ] 60 s sustained run on the oldest supported iPhone: frame time and how far feedback falls behind.
 - [ ] Thermal step-down: ball detection every other frame with the Kalman filter filling in, then a
       lower frame rate.
@@ -137,7 +195,7 @@ logic costs essentially nothing; the two neural networks are the whole budget.
 
 | Item | Needed for | Status |
 |---|---|---|
-| A Mac with Xcode | Phase 2 onward | **Critical path.** Find who has one, or ask whether Northwestern can lend one. |
+| A Mac with Xcode | Phase 2 onward | **Critical path.** A teammate's Mac runs the laptop demo; install Xcode on it (about 10-15 GB from the Mac App Store, needs admin rights). |
 | An Apple ID | Installing on our own iPhones | Free; builds expire after 7 days. |
 | Apple Developer Program ($99/year) | TestFlight builds for test players | Needed by Phase 5. |
 | Licence answer for YOLOv8 + App Store | Detector choice | Ask tech transfer or the advisor; default to YOLOX-nano meanwhile. |
