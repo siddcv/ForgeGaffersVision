@@ -1,0 +1,4 @@
+# Swift build output and editor state
+.build/
+.swiftpm/
+Package.resolved
