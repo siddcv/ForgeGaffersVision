@@ -149,3 +149,32 @@ def test_no_overlay_video_when_nothing_was_shown(tmp_path):
 
     assert OverlayRecorder(tmp_path / "x.mp4").close(5.0) is None
     assert not list(tmp_path.iterdir())
+
+
+def test_camera_report_warns_about_a_landscape_frame():
+    from src.live import camera_report, orientation
+
+    assert orientation((720, 1280)) == "portrait" and orientation((1280, 720)) == "landscape"
+    assert "WARNING" not in camera_report((720, 1280), 30.0)
+    report = camera_report((1280, 720), 30.0)
+    assert "landscape" in report and "--rotate 90" in report
+
+
+def test_recorded_drill_gets_a_manifest_row(tmp_path):
+    import csv
+    from datetime import datetime
+
+    from src.live import append_manifest_row
+
+    manifest = tmp_path / "manifest.csv"
+    manifest.write_text("clip,session,date,take,fps,resolution,orientation,drill_start_s,drill_end_s,split,notes\r\n"
+                        "old,s,d,tick-tock,60,1080x1920,portrait,,,tune,\r\n")
+    summary = {"drill_s": 21.37, "camera_fps": 29.97, "frame_size": [720, 1280], "orientation": "portrait"}
+    append_manifest_row(manifest, tmp_path / "drill_20261119_101500.mp4", summary, datetime(2026, 11, 19, 10, 15))
+
+    rows = list(csv.DictReader(open(manifest, newline="")))
+    assert rows[0]["clip"] == "old"  # existing rows untouched
+    new = rows[1]
+    assert (new["clip"], new["session"], new["date"]) == ("drill_20261119_101500", "2026-11-19_live", "2026-11-19")
+    assert (new["fps"], new["resolution"], new["orientation"]) == ("30", "720x1280", "portrait")
+    assert (new["drill_start_s"], new["drill_end_s"], new["split"]) == ("0", "21.37", "")

@@ -144,6 +144,9 @@ Every later session: open a terminal, then
 5. WHAT TO CHECK AND WRITE DOWN
 -------------------------------
 Status line (bottom of the window):
+[ ] At start the terminal prints the camera's size and frame rate ("Camera: 720 x 1280 (portrait)
+    ... Camera is delivering 30.0 fps"). A landscape WARNING means the framing is off: fix it
+    before recording (Camo portrait setting, or --rotate 90).
 [ ] fps, proc (processing ms) and lag after it settles.
     Good: above 15 fps and lag under about 150 ms. Below 10 fps, note it.
 
@@ -174,13 +177,16 @@ How it feels:
 6. WHAT TO SEND BACK
 --------------------
 Recordings are saved in:
-        data/clips/live/<date>/drill_<time>.mp4
-        data/clips/live/<date>/drill_<time>.timestamps.csv     (real capture times; keep it with the .mp4)
+        data/clips/live/<date>/drill_<date>_<time>.mp4
+        data/clips/live/<date>/drill_<date>_<time>.timestamps.csv     (real capture times; keep it with the .mp4)
     (.avi instead of .mp4 if this Mac cannot write .mp4; the terminal says which)
 Summaries and events are saved in:
-        output/live/drill_<time>.json
+        output/live/drill_<date>_<time>.json
+Each recorded drill also adds a row to data/manifest.csv (name, date, fps, resolution,
+orientation, drill window). Fill in its player, camera height/distance, lighting and split
+(tune or test) when you file the clip; that file is in git, so commit it with the labels.
 The live window's view (overlay, counts, REC), as a video that plays at real speed:
-        output/live/drill_<time>_overlay.mp4     (for watching only: label and replay the raw .mp4)
+        output/live/drill_<date>_<time>_overlay.mp4     (for watching only: label and replay the raw .mp4)
 
 [ ] Your notes from section 5, with the drill times
 [ ] One clean drill and one messy drill: each .mp4 AND its .timestamps.csv

@@ -9,11 +9,11 @@ Laptop speed says nothing about a phone; use this to feel the feedback and try c
 
 Drills: the window opens in READY (overlay running, nothing counted). START (click the button or
 press space) counts down, then resets the counts and starts the drill; STOP ends it. Each drill
-from a camera is recorded to data/clips/live/<date>/drill_<time>.mp4 with a timestamps sidecar
-holding each frame's real capture time, and its summary goes to output/live/drill_<time>.json,
+from a camera is recorded to data/clips/live/<date>/drill_<date>_<time>.mp4 with a timestamps sidecar
+holding each frame's real capture time, and its summary goes to output/live/drill_<date>_<time>.json,
 with times from the drill's first frame, so it can be labelled (src.label_clip), replayed
 (src.run_clip) and scored (src.evaluate) like any clip. The window's view (overlay, counts, REC)
-is also saved, as output/live/drill_<time>_overlay.mp4, playing at real speed; it is not a clip
+is also saved, as output/live/drill_<date>_<time>_overlay.mp4, playing at real speed; it is not a clip
 to label or replay. A clip source starts one drill at once.
 
 Usage:
@@ -24,6 +24,7 @@ Usage:
 Keys: space starts / stops a drill (same as the button), q or Esc quits (saving a running drill).
 """
 import argparse
+import csv
 import json
 import statistics
 import threading
@@ -46,6 +47,26 @@ from .video_io import iter_frames, timestamps_path
 WINDOW = "Gaffer's Vision live"
 DISPLAY_MAX_PX = 900  # longest side of the window
 ROTATIONS = {0: None, 90: cv2.ROTATE_90_CLOCKWISE, 180: cv2.ROTATE_180, 270: cv2.ROTATE_90_COUNTERCLOCKWISE}
+MEASURE_FPS_AFTER_S = 3.0  # report the camera's real frame rate once this much has been read
+
+
+def orientation(frame_size) -> str | None:
+    if frame_size is None:
+        return None
+    width, height = frame_size
+    return "portrait" if height > width else "landscape"
+
+
+def camera_report(frame_size, reported_fps: float) -> str:
+    """The camera's frame size and frame rate, with a warning for a landscape frame: the
+    recorded clips and the phone app are portrait, and a landscape frame makes the phone stand
+    further back to fit the player, so the ball is smaller and harder to detect."""
+    width, height = frame_size
+    text = f"Camera: {width} x {height} ({orientation(frame_size)}), reported {reported_fps:.0f} fps"
+    if width > height:
+        text += ("  WARNING: landscape. Set the phone-as-webcam app to portrait, or if the picture is "
+                 "on its side add --rotate 90 (or 270).")
+    return text
 
 
 # Tried in order: the first the local OpenCV build can open is used. mp4v is the usual choice;
@@ -111,6 +132,9 @@ class FrameSource:
         self.drill_t0 = None  # source time of the current drill's first frame
         self.recording_path = None  # file being written for the current drill (suffix set by the codec)
         self.last_recording = None  # the most recently finished recording
+        self.frame_size = None  # (width, height) of the frames as processed, after --rotate
+        self.drill_frames = 0  # camera frames in the current drill (all recorded, processed or not)
+        self.last_drill_frames = 0  # the same, for the most recently finished drill
         self._writer = self._times = None
         self._fps = 30.0
         self._t0 = time.perf_counter()
@@ -145,6 +169,9 @@ class FrameSource:
             self._times.close()
             self._writer = self._times = None
             self.last_recording = self.recording_path
+        if self.drill_t0 is not None:
+            self.last_drill_frames = self.drill_frames
+        self.drill_frames = 0
         self.recording_path = None
         self.drill_t0 = None
         self._stop_request = False
@@ -167,6 +194,8 @@ class FrameSource:
                     self._times.write("t_s\n")
                     print(f"Recording to {self.recording_path.resolve()}")
                 self.drill_t0 = t_s
+            if self.drill_t0 is not None:
+                self.drill_frames += 1
         if self._writer is not None:
             self._writer.write(bgr)
             self._times.write(f"{t_s:.6f}\n")
@@ -199,6 +228,7 @@ class FrameSource:
         capture.set(cv2.CAP_PROP_FRAME_HEIGHT, self._size[1])
         self._fps = capture.get(cv2.CAP_PROP_FPS) or 30.0
         first_s = None
+        measured = False
         try:
             while not self._stop:
                 ok, bgr = capture.read()
@@ -210,6 +240,12 @@ class FrameSource:
                     self._t0 = now  # frame times start at 0 on the first frame
                 t_s = now - first_s
                 bgr = self._transform(bgr)
+                if self.frame_size is None:
+                    self.frame_size = (bgr.shape[1], bgr.shape[0])
+                    print(camera_report(self.frame_size, self._fps))
+                if not measured and t_s >= MEASURE_FPS_AFTER_S:
+                    measured = True
+                    print(f"Camera is delivering {self.grabbed / t_s:.1f} fps")
                 self._handle_drill(t_s, bgr)
                 self._publish(t_s, bgr)
         finally:
@@ -227,6 +263,8 @@ class FrameSource:
                 time.sleep(wait)
             self.behind_s = max(self.behind_s, -wait)
             bgr = self._transform(frame.bgr)
+            if self.frame_size is None:
+                self.frame_size = (bgr.shape[1], bgr.shape[0])
             self._handle_drill(frame.t_s, bgr)
             self._publish(frame.t_s, bgr)
 
@@ -374,6 +412,33 @@ class Drill:
         self.proc_ms, self.lag_ms, self.events = [], [], []
         self.full_frame_runs = 0
         self.last_t = 0.0
+        self.started = datetime.now()
+
+
+def append_manifest_row(manifest: Path, recording: Path, summary: dict, when: datetime) -> None:
+    """One row in data/manifest.csv for a recorded drill, as data/README.md asks for every clip.
+
+    What live mode knows is filled in: the drill window (0 to its length: the recording starts at
+    START and ends at STOP), frame rate, resolution and orientation. Player, camera height and
+    distance, lighting and split are left blank for the person filing the clip to fill in.
+    """
+    with open(manifest, newline="") as file:
+        columns = next(csv.reader(file))
+    size = summary.get("frame_size")
+    known = {
+        "clip": recording.stem,
+        "session": f"{when:%Y-%m-%d}_live",
+        "date": f"{when:%Y-%m-%d}",
+        "take": "tick-tock",
+        "fps": round(summary["camera_fps"]) if summary.get("camera_fps") else "",
+        "resolution": f"{size[0]}x{size[1]}" if size else "",
+        "orientation": summary.get("orientation") or "",
+        "drill_start_s": 0,
+        "drill_end_s": summary["drill_s"],
+        "notes": "live drill (src.live); fill in player, camera height/distance, lighting, split",
+    }
+    with open(manifest, "a", newline="") as file:
+        csv.DictWriter(file, fieldnames=columns).writerow({c: known.get(c, "") for c in columns})
 
 
 def save_drill(drill: Drill, recording: Path | None, source: "FrameSource", args, is_camera: bool) -> None:
@@ -384,6 +449,10 @@ def save_drill(drill: Drill, recording: Path | None, source: "FrameSource", args
         "recording": str(recording) if recording else None,
         "overlay_video": str(overlay) if overlay else None,
         "drill_s": round(drill.last_t, 2),
+        "frame_size": list(source.frame_size) if source.frame_size else None,
+        "orientation": orientation(source.frame_size),
+        "camera_fps": round(source.last_drill_frames / drill.last_t, 1) if drill.last_t and is_camera else None,
+        "processed_fps": round(len(drill.proc_ms) / drill.last_t, 1) if drill.last_t else None,
         "frames_processed": len(drill.proc_ms),
         "full_frame_runs": drill.full_frame_runs,
         "clip_reader_behind_s": None if is_camera else round(source.behind_s, 2),
@@ -393,6 +462,9 @@ def save_drill(drill: Drill, recording: Path | None, source: "FrameSource", args
         "lost_control": sum(e["kind"] == "lost_control" for e in drill.events),
         "head_down": sum(e["kind"] == "head_down" for e in drill.events),
     }
+    if recording is not None and args.manifest and Path(args.manifest).exists():
+        append_manifest_row(Path(args.manifest), recording, summary, drill.started)
+        print(f"Added {recording.stem} to {args.manifest} (fill in player, camera height/distance, split)")
     out = Path("output") / "live" / f"{drill.name}.json"
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps({"summary": summary, "events": drill.events}, indent=2))
@@ -421,8 +493,10 @@ def main() -> None:
     parser.add_argument("--autostart", action="store_true",
                         help="start a drill at once, without the button (always on for clips and --no-window)")
     parser.add_argument("--no-record", action="store_true", help="count drills without saving video")
+    parser.add_argument("--manifest", default="data/manifest.csv",
+                        help="add a row per recorded drill here ('' to skip)")
     parser.add_argument("--no-overlay-video", action="store_true",
-                        help="do not save the window's view (output/live/drill_<time>_overlay.mp4)")
+                        help="do not save the window's view (output/live/drill_<date>_<time>_overlay.mp4)")
     parser.add_argument("--no-window", action="store_true", help="no display, e.g. for a timing run")
     parser.add_argument("--max-seconds", type=float, help="stop after this long")
     args = parser.parse_args()
@@ -439,7 +513,9 @@ def main() -> None:
         now = datetime.now()
         record_path = None
         if is_camera and not args.no_record:
-            record_path = Path("data/clips/live") / f"{now:%Y-%m-%d}" / f"drill_{now:%H%M%S}.mp4"
+            # The date is in the name too: names must be unique across sessions (data/README.md),
+            # since labels, caches and outputs are filed by name.
+            record_path = Path("data/clips/live") / f"{now:%Y-%m-%d}" / f"drill_{now:%Y%m%d_%H%M%S}.mp4"
         name = record_path.stem if record_path else f"{Path(args.source).stem if not is_camera else 'drill'}_{now:%H%M%S}"
         return Drill(cfg, name, record_path, save_overlay=not (args.no_overlay_video or args.no_window))
 

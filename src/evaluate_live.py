@@ -1,9 +1,9 @@
 """Score a live drill against hand labels, next to a full-rate replay of the same video.
 
 Usage:
-    python -m src.evaluate_live output/live/drill_<time>.json
-    python -m src.evaluate_live output/live/drill_<time>.json --labels data/labels/drill_<time>.csv
-    python -m src.evaluate_live output/live/drill_<time>.json --no-replay
+    python -m src.evaluate_live output/live/drill_<date>_<time>.json
+    python -m src.evaluate_live output/live/drill_<date>_<time>.json --labels data/labels/drill_<date>_<time>.csv
+    python -m src.evaluate_live output/live/drill_<date>_<time>.json --no-replay
 
 Two runs of the same drill are scored by the same rules (evaluate.py):
   live     the events the live screen reported (output/live/<drill>.json), with frames skipped
@@ -17,7 +17,7 @@ Comparing them says where errors come from:
                       overlay video (output/live/<drill>_overlay.mp4) to see which
   wrong replay only   rare; live happened to skip a frame that would have misled it
 
-Labels: data/labels/<clip>.csv, where <clip> is the recording's name (drill_<time>), or the
+Labels: data/labels/<clip>.csv, where <clip> is the recording's name (drill_<date>_<time>), or the
 clip's name when a clip was played live (python -m src.live --source <clip>). Make them with
 python -m src.label_clip <recording>. Writes output/live/<drill>.evaluation.json; nothing in
 output/<clip>_stride<N>/ is touched.
