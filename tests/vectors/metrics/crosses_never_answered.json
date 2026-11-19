@@ -19,6 +19,12 @@
   "touch_pace_min_s": 3.0,
   "lost_distance_diam": 1.5,
   "lost_control_min_s": 0.5,
+  "ball_loss_baseline_s": 4.0,
+  "ball_loss_drop_frac": 0.3,
+  "ball_loss_dip_min_s": 0.4,
+  "ball_loss_pace_change_gaps": 3,
+  "ball_loss_min_baseline_intervals": 4,
+  "ball_loss_history_intervals": 12,
   "head_down_pitch_deg": 17.0,
   "head_up_pitch_deg": 22.0,
   "head_down_min_s": 1.0,
@@ -218,9 +224,9 @@
  ],
  "expected": {
   "events": [
-   {"frame":12,"kind":"contact","t_s":0.19999999999999998,"reported_t_s":0.21666666666666665,"foot":"left","value":null},
-   {"frame":18,"kind":"speed","t_s":0.21666666666666665,"reported_t_s":0.31666666666666665,"foot":"left","value":1.6499999999999997},
-   {"frame":89,"kind":"lost_control","t_s":0.9833333333333347,"reported_t_s":1.4999999999999996,"foot":null,"value":null}
+   {"frame":12,"kind":"contact","t_s":0.19999999999999998,"reported_t_s":0.21666666666666665,"foot":"left","value":null,"source":null},
+   {"frame":18,"kind":"speed","t_s":0.21666666666666665,"reported_t_s":0.31666666666666665,"foot":"left","value":1.6499999999999997,"source":null},
+   {"frame":89,"kind":"lost_control","t_s":0.9833333333333347,"reported_t_s":1.4999999999999996,"foot":null,"value":null,"source":"spatial"}
   ],
   "final_touch_rate": {
    "last_minute": 0,

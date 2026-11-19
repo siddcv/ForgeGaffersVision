@@ -1,7 +1,8 @@
 """Streaming tick-tock metrics. Standard library only, and never reads future frames.
 
 Call step(state, observation, cfg) once per frame. cfg is any object with the
-threshold fields of config.Config, passed in so this module imports nothing else.
+threshold fields of config.Config, passed in so this module imports nothing but
+the standard library and ball_loss (also standard library only).
 
 Two touch counts:
   contact  any touch on the ball: a direction change next to a foot. Setup taps, recovery
@@ -13,6 +14,8 @@ Two touch counts:
 """
 import math
 from dataclasses import dataclass, replace
+
+from . import ball_loss
 
 
 @dataclass(frozen=True)
@@ -33,6 +36,7 @@ class Event:
     reported_t_s: float  # when the system knew; the difference is detection latency
     foot: str | None = None
     value: float | None = None
+    source: str | None = None  # lost_control only: "spatial" (ball away / not found) or "rhythm" (touch pace)
 
 
 @dataclass(frozen=True)
@@ -66,6 +70,7 @@ class State:
     not_found_since_s: float | None = None
     head_low_since_s: float | None = None
     head_down_since_s: float | None = None
+    rhythm: ball_loss.BallLossState = ball_loss.BallLossState()  # touch-pace ball-loss detector
 
 
 @dataclass(frozen=True)
@@ -116,6 +121,15 @@ def foot_distance(ball_xy: tuple, foot: tuple) -> float | None:
     if not foot:
         return None
     return min(math.dist(ball_xy, point) for point in foot)
+
+
+def count_lost_control(events) -> dict:
+    """Number of lost_control events from each detector."""
+    counts = {"spatial": 0, "rhythm": 0}
+    for event in events:
+        if event.kind == "lost_control" and event.source in counts:
+            counts[event.source] += 1
+    return counts
 
 
 def nearer_foot(distances: tuple) -> tuple:
@@ -302,7 +316,7 @@ def _step_lost_control(state: State, obs: Observation, distances: tuple, cfg) ->
         since = state.not_found_since_s if state.not_found_since_s is not None else obs.t_s
         state = replace(state, not_found_since_s=since, far_since_s=None)
         if not state.lost and obs.t_s - since >= cfg.lost_control_min_s:
-            return replace(state, lost=True), [Event("lost_control", since, obs.t_s)]
+            return replace(state, lost=True), [Event("lost_control", since, obs.t_s, source="spatial")]
         return state, []
 
     state = replace(state, not_found_since_s=None)
@@ -320,7 +334,7 @@ def _step_lost_control(state: State, obs: Observation, distances: tuple, cfg) ->
     since = state.far_since_s if state.far_since_s is not None else obs.t_s
     state = replace(state, far_since_s=since)
     if obs.t_s - since >= cfg.lost_control_min_s:
-        return replace(state, lost=True), [Event("lost_control", since, obs.t_s)]
+        return replace(state, lost=True), [Event("lost_control", since, obs.t_s, source="spatial")]
     return state, []
 
 
@@ -345,6 +359,27 @@ def _step_head(state: State, obs: Observation, cfg) -> tuple:
     return state, []
 
 
+def _step_rhythm(state: State, events: list, cfg) -> tuple:
+    """Feed this frame's contacts to the rhythm detector; report its losses as lost_control.
+
+    Contacts, not tick-tocks: a tick-tock needs the ball seen past the midpoint, so on clips
+    with patchy detection tick-tocks drop out and the gaps reflect detection, not the player.
+    Contacts are also reported at once, while tick-tocks lag one touch gap.
+
+    A spatial lost_control or reset this frame interrupts it first, so the touch gap
+    across a spatial incident is never judged and one incident is reported once.
+    """
+    rhythm = state.rhythm
+    if any(e.kind in ("lost_control", "reset") for e in events):
+        rhythm = ball_loss.interrupt(rhythm)
+    new_events = []
+    for contact in (e for e in events if e.kind == "contact"):
+        rhythm, losses = ball_loss.step(rhythm, contact.t_s, contact.reported_t_s, cfg)
+        new_events += [
+            Event("lost_control", loss.t_s, loss.reported_t_s, value=loss.value, source="rhythm")
+            for loss in losses
+        ]
+    return replace(state, rhythm=rhythm), new_events
 def _expire_pending(state: State, t_s: float, cfg) -> State:
     """Drop the pending contact once the other foot can no longer confirm it: too much time has
     passed, or control was lost."""
@@ -370,6 +405,8 @@ def step(state: State, obs: Observation, cfg) -> tuple:
         state, new_events = _step_ball(state, obs, distances, cfg)
         events += new_events
     state, new_events = _step_lost_control(state, obs, distances, cfg)
+    events += new_events
+    state, new_events = _step_rhythm(state, events, cfg)
     events += new_events
     state = _expire_pending(state, obs.t_s, cfg)
     state, new_events = _step_head(state, obs, cfg)

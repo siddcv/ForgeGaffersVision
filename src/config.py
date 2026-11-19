@@ -53,7 +53,15 @@ class Config:
     # Lost control
     lost_distance_diam: float = 1.5
     lost_control_min_s: float = 0.5
- 
+
+    # Ball loss from touch rhythm (ball_loss.py)
+    ball_loss_baseline_s: float = 4.0  # play this long before locking a baseline pace
+    ball_loss_drop_frac: float = 0.3  # a gap is late once it exceeds baseline / (1 - drop_frac)
+    ball_loss_dip_min_s: float = 0.4  # a late gap is at least this long
+    ball_loss_pace_change_gaps: int = 3  # this many late gaps in a row is a slowdown, not a loss
+    ball_loss_min_baseline_intervals: int = 4  # intervals needed before locking a baseline
+    ball_loss_history_intervals: int = 12  # recent intervals kept; baseline is their median
+
     # Head position
     # Provisional calibration for 20261102_134245: cropped Face Landmarker samples
     # in manually labelled head-down intervals were lower (~4.5-10.9 deg) than

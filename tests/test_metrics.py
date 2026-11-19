@@ -3,9 +3,10 @@ from dataclasses import replace
 import pytest
 
 from src.config import Config
-from src.metrics import Observation, foot_by_direction, initial_state, step
+from src.metrics import Event, Observation, count_lost_control, foot_by_direction, initial_state, step
 from tests.synth import (
     DIAMETER_PX, LEFT_FOOT, RIGHT_FOOT, Y, ball_at, head, head_levels, missing, path, synth_tick_tock,
+    with_ball_away, with_hold,
 )
 
 CFG = Config()
@@ -250,6 +251,61 @@ def test_far_ball_is_lost_control_then_reset_when_it_returns():
 
 def test_normal_play_has_no_lost_control():
     assert kinds(run(synth_tick_tock(20)), "lost_control") == []
+
+
+def test_spatial_lost_control_is_marked_spatial():
+    events = run(ball_at(1000.0, 30) + ball_at(240.0, 3, start=1.0))
+    assert [e.source for e in kinds(events, "lost_control")] == ["spatial"]
+
+
+# Rhythm: synth touches come every ~0.44 s, so the baseline locks after ~4 s of play.
+def test_long_steady_play_has_no_rhythm_loss():
+    assert kinds(run(synth_tick_tock(40)), "lost_control") == []
+
+
+def test_one_late_touch_then_normal_pace_is_rhythm_lost_control():
+    events = run(with_hold(synth_tick_tock(30), at_s=7.0, hold_s=0.5))
+    lost = kinds(events, "lost_control")
+    assert [e.source for e in lost] == ["rhythm"]
+    assert lost[0].t_s < 7.0 < lost[0].t_s + lost[0].value
+    assert lost[0].reported_t_s > lost[0].t_s + lost[0].value  # confirmed by the next touch
+
+
+def _feed_rhythm(kind, times):
+    """Drive _step_rhythm directly with one event of the given kind per time, alternating feet."""
+    from src.metrics import _step_rhythm
+    state, losses = initial_state(), []
+    for i, t in enumerate(times):
+        state, new = _step_rhythm(state, [Event(kind, t, t, foot=("left", "right")[i % 2])], CFG)
+        losses += new
+    return losses
+
+
+def test_rhythm_reads_contacts_not_tick_tocks():
+    # Steady 0.4 s pace for 6 s, one 0.9 s gap, then steady again.
+    times = [0.4 * k for k in range(16)]
+    times += [times[-1] + 0.9 + 0.4 * k for k in range(6)]
+    assert [e.source for e in _feed_rhythm("contact", times)] == ["rhythm"]
+    assert _feed_rhythm("touch", times) == []
+
+
+def test_count_lost_control_splits_by_source():
+    events = [
+        Event("lost_control", 1.0, 1.5, source="spatial"),
+        Event("touch", 2.0, 2.1, foot="left"),
+        Event("lost_control", 3.0, 4.0, value=1.0, source="rhythm"),
+        Event("lost_control", 5.0, 5.5, source="spatial"),
+        Event("reset", 6.0, 6.0),
+    ]
+    assert count_lost_control(events) == {"spatial": 2, "rhythm": 1}
+    assert count_lost_control([]) == {"spatial": 0, "rhythm": 0}
+
+
+def test_spatial_loss_is_not_also_reported_as_rhythm_loss():
+    # The ball gets away for 1 s mid-drill: one incident, reported once.
+    events = run(with_ball_away(synth_tick_tock(30), at_s=7.0, away_s=1.0))
+    assert [e.source for e in kinds(events, "lost_control")] == ["spatial"]
+    assert len(kinds(events, "reset")) == 1
 
 
 def test_head_down_just_under_one_second_is_not_reported():
