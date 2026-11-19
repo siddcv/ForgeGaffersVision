@@ -360,7 +360,11 @@ def _step_head(state: State, obs: Observation, cfg) -> tuple:
 
 
 def _step_rhythm(state: State, events: list, cfg) -> tuple:
-    """Feed this frame's touches to the rhythm detector; report its losses as lost_control.
+    """Feed this frame's contacts to the rhythm detector; report its losses as lost_control.
+
+    Contacts, not tick-tocks: a tick-tock needs the ball seen past the midpoint, so on clips
+    with patchy detection tick-tocks drop out and the gaps reflect detection, not the player.
+    Contacts are also reported at once, while tick-tocks lag one touch gap.
 
     A spatial lost_control or reset this frame interrupts it first, so the touch gap
     across a spatial incident is never judged and one incident is reported once.
@@ -369,8 +373,8 @@ def _step_rhythm(state: State, events: list, cfg) -> tuple:
     if any(e.kind in ("lost_control", "reset") for e in events):
         rhythm = ball_loss.interrupt(rhythm)
     new_events = []
-    for touch in (e for e in events if e.kind == "touch"):
-        rhythm, losses = ball_loss.step(rhythm, touch.t_s, touch.reported_t_s, cfg)
+    for contact in (e for e in events if e.kind == "contact"):
+        rhythm, losses = ball_loss.step(rhythm, contact.t_s, contact.reported_t_s, cfg)
         new_events += [
             Event("lost_control", loss.t_s, loss.reported_t_s, value=loss.value, source="rhythm")
             for loss in losses

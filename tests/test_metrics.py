@@ -271,6 +271,24 @@ def test_one_late_touch_then_normal_pace_is_rhythm_lost_control():
     assert lost[0].reported_t_s > lost[0].t_s + lost[0].value  # confirmed by the next touch
 
 
+def _feed_rhythm(kind, times):
+    """Drive _step_rhythm directly with one event of the given kind per time, alternating feet."""
+    from src.metrics import _step_rhythm
+    state, losses = initial_state(), []
+    for i, t in enumerate(times):
+        state, new = _step_rhythm(state, [Event(kind, t, t, foot=("left", "right")[i % 2])], CFG)
+        losses += new
+    return losses
+
+
+def test_rhythm_reads_contacts_not_tick_tocks():
+    # Steady 0.4 s pace for 6 s, one 0.9 s gap, then steady again.
+    times = [0.4 * k for k in range(16)]
+    times += [times[-1] + 0.9 + 0.4 * k for k in range(6)]
+    assert [e.source for e in _feed_rhythm("contact", times)] == ["rhythm"]
+    assert _feed_rhythm("touch", times) == []
+
+
 def test_count_lost_control_splits_by_source():
     events = [
         Event("lost_control", 1.0, 1.5, source="spatial"),
