@@ -112,6 +112,7 @@ Every later session: open a terminal, then
 -------------------------
 [ ] Start it:
         python -m src.live --source 0
+        python -m src.live --source 0 --rotate 90
     If the window shows the Mac's own camera, quit and try --source 1, then --source 2.
 
 [ ] First run only:
