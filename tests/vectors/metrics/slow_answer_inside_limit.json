@@ -11,7 +11,7 @@
   "touch_foot_rule": "direction",
   "touch_min_interval_s": 0.08,
   "ticktock_max_arrival_s": 0.5,
-  "touch_max_gap_s": 0.25,
+  "touch_max_gap_s": 0.4,
   "speed_window_s": 0.1,
   "touches_per_minute_goal": 150,
   "touch_minute_s": 60.0,

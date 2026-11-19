@@ -34,7 +34,14 @@ class Config:
     # A contact counts as a tick-tock only if the ball crosses the midpoint between the feet and
     # the other foot makes the next contact within this time. Labelled touch gaps were 0.30-0.6 s.
     ticktock_max_arrival_s: float = 1.0
-    touch_max_gap_s: float = 0.25
+    # Longest gap between two ball detections that still counts as one track (longer: the
+    # direction is forgotten, so a turn at a foot cannot be seen). At 60 fps it rarely matters,
+    # but at lower processed frame rates one missed detection already exceeded 0.25 s. All 9
+    # tune clips, 516 labelled tick-tocks, recall / false alarms, 0.25 -> 0.4:
+    # 60 fps 89.5% / 22 -> 90.3% / 23; 30 fps 86.0% / 20 -> 89.5% / 21;
+    # 15 fps 74.4% / 14 -> 86.4% / 19; 8.6 fps 54.5% / 7 -> 70.7% / 17.
+    # 0.5 gained no recall at 30 or 60 fps and added false alarms (20261102_134948).
+    touch_max_gap_s: float = 0.4
     speed_window_s: float = 0.10
 
     # Touches per minute
