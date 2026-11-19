@@ -1,0 +1,180 @@
+import pytest
+import cv2
+import numpy as np
+
+from src.live import FrameSource
+
+
+def write_clip(path, n_frames, fps=30.0):
+    writer = cv2.VideoWriter(str(path), cv2.VideoWriter_fourcc(*"mp4v"), fps, (64, 48))
+    for value in range(n_frames):
+        writer.write(np.full((48, 64, 3), value * 8, dtype=np.uint8))
+    writer.release()
+
+
+def test_clip_source_plays_in_order_and_ends(tmp_path):
+    path = tmp_path / "clip.mp4"
+    write_clip(path, 10)
+    source = FrameSource(str(path))
+    seen, last = [], -1
+    while (item := source.next_after(last)) is not None:
+        index, t_s, bgr, arrival = item
+        assert index > last and bgr.shape == (48, 64, 3)
+        seen.append(t_s)
+        last = index
+    source.stop()
+    assert source.grabbed == 10
+    assert seen == sorted(seen) and seen[-1] > 0.25  # played at its own pace, newest frames reached
+
+
+def test_rotate_and_flip_are_applied_before_processing(tmp_path):
+    path = tmp_path / "clip.mp4"
+    write_clip(path, 2)
+    source = FrameSource(str(path), rotate=90, flip=True)
+    item = source.next_after(-1)
+    source.stop()
+    assert item[2].shape == (64, 48, 3)  # portrait after a 90 degree turn
+
+
+def test_video_writer_falls_back_past_a_codec_that_does_not_open(tmp_path):
+    from src.live import open_video_writer
+
+    writer, path = open_video_writer(tmp_path / "s.mp4", 30.0, (64, 48), codecs=(("mp4v", ".notavideo"), ("mp4v", ".mp4")))
+    for _ in range(3):
+        writer.write(np.zeros((48, 64, 3), np.uint8))
+    writer.release()
+    assert path == tmp_path / "s.mp4" and cv2.VideoCapture(str(path)).read()[0]
+
+
+def test_video_writer_fails_loudly_when_no_codec_opens(tmp_path):
+    import pytest
+
+    from src.live import open_video_writer
+
+    with pytest.raises(RuntimeError, match="--no-record"):
+        open_video_writer(tmp_path / "s.mp4", 30.0, (64, 48), codecs=(("mp4v", ".notavideo"),))
+    assert not list(tmp_path.iterdir())  # nothing half-written left behind
+
+
+class FakeCamera:
+    """Stands in for cv2.VideoCapture(index): endless 64 x 48 frames at about 100 fps."""
+
+    def __init__(self, index):
+        self.n = 0
+
+    def isOpened(self):
+        return True
+
+    def set(self, prop, value):
+        return True
+
+    def get(self, prop):
+        return 30.0
+
+    def read(self):
+        import time
+
+        time.sleep(0.01)
+        self.n += 1
+        return True, np.full((48, 64, 3), self.n % 250, np.uint8)
+
+    def release(self):
+        pass
+
+
+def wait_frames(source, n, last=-1):
+    """Consume frames until n more have arrived; returns the last index seen."""
+    target = last + n
+    while last < target:
+        last = source.next_after(last)[0]
+    return last
+
+
+def frames_in(path):
+    capture = cv2.VideoCapture(str(path))
+    frames = 0
+    while capture.read()[0]:
+        frames += 1
+    return frames
+
+
+def test_each_drill_is_recorded_from_start_to_stop(tmp_path, monkeypatch):
+    import src.live as live
+    from src.video_io import read_timestamps
+
+    monkeypatch.setattr(live, "open_camera", FakeCamera)
+    source = live.FrameSource("0")
+    last = wait_frames(source, 5)  # READY: shown but not recorded
+    assert source.recording_path is None and source.drill_t0 is None
+
+    source.start_drill(tmp_path / "drill_1.mp4")
+    last = wait_frames(source, 20, last)
+    first = source.stop_drill()
+    last = wait_frames(source, 5, last)  # READY again between drills
+    source.start_drill(tmp_path / "drill_2.mp4")
+    last = wait_frames(source, 10, last)
+    second = source.stop_drill()
+    source.stop()
+
+    assert (first, second) == (tmp_path / "drill_1.mp4", tmp_path / "drill_2.mp4")
+    for path, at_least in ((first, 20), (second, 10)):
+        times = read_timestamps(str(path))  # from the sidecar, starting at 0 on the drill's first frame
+        assert frames_in(path) == len(times) >= at_least
+        assert times[0] == 0 and (times[1:] > times[:-1]).all()
+    assert source.recording_path is None and source.drill_t0 is None
+
+
+def test_overlay_video_plays_at_real_speed(tmp_path):
+    from src.live import OverlayRecorder
+
+    recorder = OverlayRecorder(tmp_path / "drill_overlay.mp4")
+    # Views arrive unevenly, as the live loop shows them (about 12 per second), over a 2 s drill.
+    for i, t_s in enumerate([0.0, 0.07, 0.2, 0.31, 0.5, 0.9, 1.3, 1.5]):
+        recorder.add(np.full((48, 64, 3), 30 * i, np.uint8), t_s)
+    path = recorder.close(end_t_s=2.0)
+
+    capture = cv2.VideoCapture(str(path))
+    assert capture.get(cv2.CAP_PROP_FPS) == pytest.approx(30.0)
+    frames = []
+    while (frame := capture.read())[0]:
+        frames.append(frame[1])
+    assert len(frames) == 60  # 2.0 s at 30 fps
+    # The view shown at 0.5 s (index 4) stays on screen until the next one at 0.9 s.
+    # Compression shifts flat gray by a few levels; neighbouring views differ by 30.
+    assert abs(int(frames[20][0, 0, 0]) - 120) <= 8 and abs(int(frames[26][0, 0, 0]) - 120) <= 8
+
+
+def test_no_overlay_video_when_nothing_was_shown(tmp_path):
+    from src.live import OverlayRecorder
+
+    assert OverlayRecorder(tmp_path / "x.mp4").close(5.0) is None
+    assert not list(tmp_path.iterdir())
+
+
+def test_camera_report_warns_about_a_landscape_frame():
+    from src.live import camera_report, orientation
+
+    assert orientation((720, 1280)) == "portrait" and orientation((1280, 720)) == "landscape"
+    assert "WARNING" not in camera_report((720, 1280), 30.0)
+    report = camera_report((1280, 720), 30.0)
+    assert "landscape" in report and "--rotate 90" in report
+
+
+def test_recorded_drill_gets_a_manifest_row(tmp_path):
+    import csv
+    from datetime import datetime
+
+    from src.live import append_manifest_row
+
+    manifest = tmp_path / "manifest.csv"
+    manifest.write_text("clip,session,date,take,fps,resolution,orientation,drill_start_s,drill_end_s,split,notes\r\n"
+                        "old,s,d,tick-tock,60,1080x1920,portrait,,,tune,\r\n")
+    summary = {"drill_s": 21.37, "camera_fps": 29.97, "frame_size": [720, 1280], "orientation": "portrait"}
+    append_manifest_row(manifest, tmp_path / "drill_20261119_101500.mp4", summary, datetime(2026, 11, 19, 10, 15))
+
+    rows = list(csv.DictReader(open(manifest, newline="")))
+    assert rows[0]["clip"] == "old"  # existing rows untouched
+    new = rows[1]
+    assert (new["clip"], new["session"], new["date"]) == ("drill_20261119_101500", "2026-11-19_live", "2026-11-19")
+    assert (new["fps"], new["resolution"], new["orientation"]) == ("30", "720x1280", "portrait")
+    assert (new["drill_start_s"], new["drill_end_s"], new["split"]) == ("0", "21.37", "")

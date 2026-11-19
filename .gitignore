@@ -3,7 +3,6 @@ data/clips/
 *.mov
 cache/
 models/
-output/
 *.pt
 *.task
 __pycache__/

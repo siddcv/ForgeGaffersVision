@@ -52,3 +52,11 @@ def test_lost_banner_shows_from_report_for_a_while():
     assert lost_banner(event, 4.0) == "LOST CONTROL (rhythm)"
     assert lost_banner(event, 4.0 + LOST_BANNER_S - 0.01) == "LOST CONTROL (rhythm)"
     assert lost_banner(event, 4.0 + LOST_BANNER_S) is None
+
+
+def test_touch_rate_text():
+    from src.metrics import TouchRate
+    from src.overlay import touch_rate_text
+    assert touch_rate_text(None, 150) == "goal 150/min"
+    assert touch_rate_text(TouchRate(12, False, None), 150) == "pace --  12 so far  goal 150"
+    assert touch_rate_text(TouchRate(151, True, 148.4), 150) == "pace 148/min  last min 151  goal 150"

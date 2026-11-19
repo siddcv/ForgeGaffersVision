@@ -31,7 +31,7 @@ def test_feet_recover_after_clip_starts_with_no_person(monkeypatch):
         seen.append(observation)
         return real_step(state, observation, cfg)
 
-    monkeypatch.setattr(rc.metrics, "step", recording_step)
+    monkeypatch.setattr(metrics, "step", recording_step)
     rc.replay(_cache_with_person_missing_first(n_frames=40, missing=10), Config())
 
     assert all(obs.left_foot == () and obs.right_foot == () for obs in seen[:10])

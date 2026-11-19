@@ -11,10 +11,10 @@ import cv2
 import numpy as np
 
 from . import ball as ball_module
-from . import metrics
 from .config import Config
-from .filters import OneEuroFilter
-from .pose import LEFT_FOOT, RIGHT_FOOT, PoseEstimator, coarse_head_pitch_deg, visible_points
+from .face_pose import open_head_pitch_sampler
+from .pipeline import POSE_PITCH, FramePipeline
+from .pose import LEFT_FOOT, RIGHT_FOOT, PoseEstimator, visible_points
 from .video_io import iter_frames, read_timestamps
 
 
@@ -35,9 +35,10 @@ def build_cache(clip_path: str, cache_path: Path, cfg: Config) -> None:
     tracker's diameter plays that role; changing crop settings needs --refresh.
     """
     pose = PoseEstimator()
+    head_sampler, face_pose = open_head_pitch_sampler(cfg)
     detector = ball_module.YoloBallDetector(cfg)
     k = cfg.ball_candidates
-    times, landmarks, crops, crop_balls, full_balls = [], [], [], [], []
+    times, landmarks, head_pitch, crops, crop_balls, full_balls = [], [], [], [], [], []
     last_ms = -1
     diameter = None
     try:
@@ -45,7 +46,10 @@ def build_cache(clip_path: str, cache_path: Path, cfg: Config) -> None:
             height, width = frame.bgr.shape[:2]
             t_ms = max(int(frame.t_s * 1000), last_ms + 1)  # MediaPipe needs strictly increasing
             last_ms = t_ms
-            points = pose.detect(cv2.cvtColor(frame.bgr, cv2.COLOR_BGR2RGB), t_ms)
+            rgb = cv2.cvtColor(frame.bgr, cv2.COLOR_BGR2RGB)
+            points = pose.detect(rgb, t_ms)
+            pitch = head_sampler.update(frame.bgr, points, frame.t_s, t_ms) if head_sampler else None
+            head_pitch.append(np.nan if pitch is None else pitch)
             feet = visible_points(points, LEFT_FOOT + RIGHT_FOOT, cfg.pose_min_visibility)
             crop = ball_module.foot_crop(feet, width, height, cfg, diameter)
             crop_dets = []
@@ -67,73 +71,68 @@ def build_cache(clip_path: str, cache_path: Path, cfg: Config) -> None:
                 print(f"  processed {frame.index} frames")
     finally:
         pose.close()
+        if face_pose is not None:
+            face_pose.close()
     cache_path.parent.mkdir(parents=True, exist_ok=True)
     np.savez_compressed(
-        cache_path, t_s=np.array(times), landmarks=np.array(landmarks), crops=np.array(crops),
+        cache_path, t_s=np.array(times), landmarks=np.array(landmarks),
+        head_pitch_deg=np.array(head_pitch, dtype=float), crops=np.array(crops),
         crop_balls=np.array(crop_balls), full_balls=np.array(full_balls),
     )
 
 
+def face_pitch(value) -> float | None:
+    """A cached Face Landmarker sample: NaN (no face found) means no pitch this frame."""
+    return float(value) if np.isfinite(value) else None
+
+
 def replay(cache, cfg: Config, stride: int = 1) -> list:
     """Feed cached model outputs through the same per-frame logic the phone will run."""
-    search = ball_module.SearchState()
-    tracker = ball_module.BallTracker(cfg)
-    state = metrics.initial_state()
+    pipeline = FramePipeline(cfg)
     crop_balls, full_balls = cache["crop_balls"], cache["full_balls"]
     if crop_balls.ndim == 2:  # caches written before candidates were kept
         crop_balls, full_balls = crop_balls[:, None, :], full_balls[:, None, :]
-    euro = {}
     records = []
-
-    def smooth_points(indices, points_at, t_s):
-        smoothed = []
-        for index in indices:
-            # Written as "not >=" so NaN visibility (no person in frame) is skipped too;
-            # a NaN fed into a One Euro filter would make it output NaN forever.
-            if not points_at[index, 2] >= cfg.pose_min_visibility:
-                continue
-            xy = []
-            for axis in (0, 1):
-                key = (index, axis)
-                if key not in euro:
-                    euro[key] = OneEuroFilter(
-                        cfg.one_euro_min_cutoff, cfg.one_euro_beta, cfg.one_euro_d_cutoff,
-                    )
-                xy.append(euro[key].update(t_s, float(points_at[index, axis])))
-            smoothed.append(tuple(xy))
-        return tuple(smoothed)
-
+    # If Face Landmarker produced any valid samples, do not silently mix its
+    # measurements with the incompatible rough Pose estimate on missed frames.
+    has_face_pitch = (
+        "head_pitch_deg" in cache and np.isfinite(cache["head_pitch_deg"]).any()
+    )
     for i in range(0, len(cache["t_s"]), stride):
-        t_s = float(cache["t_s"][i])
         crop_row = cache["crops"][i]
-        crop = None if np.isnan(crop_row[0]) else tuple(crop_row)
-        left_foot = smooth_points(LEFT_FOOT, cache["landmarks"][i], t_s)
-        right_foot = smooth_points(RIGHT_FOOT, cache["landmarks"][i], t_s)
-        feet = left_foot + right_foot
-        search, detection, searched = ball_module.search_step(
-            search, t_s, crop,
-            tracker.choose(t_s, _from_rows(crop_balls[i]), feet),
-            tracker.choose(t_s, _from_rows(full_balls[i]), feet),
-            cfg,
+        record = pipeline.step(
+            t_s=float(cache["t_s"][i]),
+            landmarks=cache["landmarks"][i],
+            crop=None if np.isnan(crop_row[0]) else tuple(crop_row),
+            crop_candidates=_from_rows(crop_balls[i]),
+            full_candidates=_from_rows(full_balls[i]),
+            head_pitch_deg=face_pitch(cache["head_pitch_deg"][i]) if has_face_pitch else POSE_PITCH,
         )
-        ball_xy, predicted = tracker.update(t_s, detection, searched)
-        observation = metrics.Observation(
-            t_s=t_s,
-            # Metrics see detections only: on a real clip, snapping from a prediction back to the
-            # next detection looks like a direction change and adds false touches.
-            ball_xy=None if predicted else ball_xy,
-            ball_diameter_px=ball_module.box_diameter_px(detection) if detection else None,
-            searched_full_frame=searched,
-            left_foot=left_foot,
-            right_foot=right_foot,
-            head_pitch_deg=coarse_head_pitch_deg(cache["landmarks"][i], cfg.pose_min_visibility),
-        )
-        state, events = metrics.step(state, observation, cfg)
-        records.append({
-            "index": i, "t_s": t_s, "crop": crop, "ball": detection, "ball_xy": ball_xy,
-            "predicted": predicted, "searched_full_frame": searched, "events": events,
-        })
+        records.append({"index": i, **record})
     return records
+
+
+def touches_per_minute_summary(records: list, touches: list, cfg: Config) -> dict:
+    """Average rate over the drill, best full minute, and the goal.
+
+    The drill is taken as first to last touch, since warm-up and walking to the phone
+    have no touches. best_minute stays None on a drill shorter than a minute.
+    """
+    times = sorted(e.t_s for e in touches)
+    span_s = times[-1] - times[0] if len(times) > 1 else 0.0
+    rates = [r["touch_rate"] for r in records if r.get("touch_rate")]
+    full = [r.last_minute for r in rates if r.minute_complete]
+    paces = [r.pace_per_min for r in rates if r.pace_per_min is not None]
+    best = max(full) if full else None
+    return {
+        "goal": cfg.touches_per_minute_goal,
+        "touches": len(times),
+        "drill_s": round(span_s, 2),
+        "average": round((len(times) - 1) / span_s * 60, 1) if span_s else None,
+        "best_minute": best,
+        "peak_pace": round(max(paces), 1) if paces else None,
+        "goal_met": None if best is None else best >= cfg.touches_per_minute_goal,
+    }
 
 
 def summarize(records: list, cache, cfg: Config) -> dict:
@@ -158,11 +157,16 @@ def summarize(records: list, cache, cfg: Config) -> dict:
         "low_foot_visibility_pct": float(100 * np.mean(~(visibility >= cfg.pose_min_visibility))),
         "ball_found_pct": 100 * float(np.mean([r["ball"] is not None for r in records])),
         "ball_tracked_pct": 100 * float(np.mean([r["ball_xy"] is not None for r in records])),
-        "searching_pct": 100 * float(np.mean([r["searched_full_frame"] for r in records])),
+        "searching_pct": 100 * float(np.mean([r["searched_full_frame"] for r in records])),        # Tick-tocks: contacts that sent the ball across to the other foot.
         "touches": {
             "left": sum(e.foot == "left" for e in touches),
             "right": sum(e.foot == "right" for e in touches),
         },
+        # Every touch on the ball, including setup and recovery taps and same-foot repeats.
+        "contacts": {
+            foot: sum(e.kind == "contact" and e.foot == foot for e in events) for foot in ("left", "right")
+        },
+        "touches_per_minute": touches_per_minute_summary(records, touches, cfg),
         "mean_speed_mps": {
             foot: float(np.mean(values)) if values else None for foot, values in speeds.items()
         },
@@ -170,6 +174,19 @@ def summarize(records: list, cache, cfg: Config) -> dict:
         "lost_control_by_source": metrics.count_lost_control(events),
         "resets": sum(e.kind == "reset" for e in events),
         "head_down": sum(e.kind == "head_down" for e in events),
+        "head_pose_valid_pct": (
+            round(100 * float(np.isfinite(cache["head_pitch_deg"]).mean()), 1)
+            if "head_pitch_deg" in cache else None
+        ),
+        "head_pitch_deg_stats": (
+            {
+                "min": round(float(np.nanmin(cache["head_pitch_deg"])), 2),
+                "median": round(float(np.nanmedian(cache["head_pitch_deg"])), 2),
+                "max": round(float(np.nanmax(cache["head_pitch_deg"])), 2),
+            }
+            if "head_pitch_deg" in cache and np.isfinite(cache["head_pitch_deg"]).any()
+            else None
+        ),
         "mean_touch_latency_ms": float(np.mean(latencies) * 1000) if latencies else None,
     }
 
@@ -209,7 +226,13 @@ def main() -> None:
     cfg = Config()
     stem = Path(args.clip).stem
     cache_path = Path("cache") / f"{stem}.npz"
-    if args.refresh or not cache_path.exists():
+    rebuild = args.refresh or not cache_path.exists()
+    if not rebuild:
+        with np.load(cache_path) as existing_cache:
+            if "head_pitch_deg" not in existing_cache.files:
+                print("Cache predates Face Landmarker; rebuilding it.")
+                rebuild = True
+    if rebuild:
         print(f"Running models on {args.clip}")
         build_cache(args.clip, cache_path, cfg)
     cache = dict(np.load(cache_path))

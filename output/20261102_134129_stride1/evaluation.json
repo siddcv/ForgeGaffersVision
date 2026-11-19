@@ -1,0 +1,32 @@
+{
+  "clip": "20261102_134129",
+  "drill_window_s": [
+    null,
+    null
+  ],
+  "results": {
+    "touch": {
+      "tolerance_s": 0.2,
+      "labelled": 69,
+      "detected": 67,
+      "hits": 66,
+      "misses": 3,
+      "false_alarms": 1,
+      "precision": 0.9850746268656716,
+      "recall": 0.9565217391304348,
+      "f1": 0.9705882352941176,
+      "median_timing_error_ms": 67.04999999999961,
+      "mean_latency_ms": 443.69009090909043,
+      "missed_at_s": [
+        19.822,
+        25.203,
+        30.1
+      ],
+      "false_alarm_at_s": [
+        20.239
+      ],
+      "foot_accuracy": 1.0,
+      "wrong_foot_at_s": []
+    }
+  }
+}
