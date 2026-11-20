@@ -71,7 +71,7 @@ class FramePipeline:
 
         head_pitch_deg is the Face Landmarker pitch (None when no face was found this frame).
         Leave it out to use the rough pose-only estimate instead, which is on a different scale:
-        the head thresholds in config are calibrated for Face Landmarker pitch.
+        the head-pitch cutoff in config is calibrated for Face Landmarker pitch.
         """
         cfg = self.cfg
         if head_pitch_deg is POSE_PITCH:

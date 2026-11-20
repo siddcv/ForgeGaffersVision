@@ -319,11 +319,12 @@ def test_head_down_over_one_second_is_reported_with_start_time():
     assert events[0].reported_t_s - events[0].t_s == pytest.approx(1.0)
 
 
-def test_head_hysteresis_does_not_flicker():
-    pitches = [DOWN] * 40 + [BETWEEN, DOWN] * 10 + [UP]
+def test_head_single_cutoff_ends_down_at_boundary():
+    pitches = [DOWN] * 40 + [BETWEEN]
     events = run(head(pitches))
     assert len(kinds(events, "head_down")) == 1
     assert len(kinds(events, "head_up")) == 1
+    assert kinds(events, "head_up")[0].t_s == pytest.approx(40 / 30)
 
 
 def test_step_does_not_mutate_previous_state():

@@ -1,0 +1,106 @@
+{
+  "summary": {
+    "source": "0",
+    "recording": "data/clips/live/2026-11-19/drill_20261119_151324.mp4",
+    "overlay_video": "output/live/drill_20261119_151324_overlay.mp4",
+    "drill_s": 38.27,
+    "frame_size": [
+      1280,
+      720
+    ],
+    "orientation": "landscape",
+    "camera_fps": 30.1,
+    "processed_fps": 22.6,
+    "frames_processed": 866,
+    "full_frame_runs": 859,
+    "clip_reader_behind_s": null,
+    "processing_ms": {
+      "median": 29.2,
+      "p90": 32.3
+    },
+    "feedback_lag_ms": {
+      "median": 47.4,
+      "p90": 60.1
+    },
+    "touch_left": 0,
+    "touch_right": 0,
+    "contact_left": 0,
+    "contact_right": 0,
+    "lost_control": 1,
+    "head_down": 4
+  },
+  "events": [
+    {
+      "frame": 21327,
+      "kind": "lost_control",
+      "t_s": 0.2327356250000321,
+      "reported_t_s": 0.7992183329999989,
+      "foot": null,
+      "value": null,
+      "source": "spatial"
+    },
+    {
+      "frame": 21624,
+      "kind": "head_down",
+      "t_s": 9.666011000000026,
+      "reported_t_s": 10.697675249999975,
+      "foot": null,
+      "value": null,
+      "source": null
+    },
+    {
+      "frame": 22010,
+      "kind": "head_up",
+      "t_s": 23.56439387499995,
+      "reported_t_s": 23.56439387499995,
+      "foot": null,
+      "value": 13.898382874999925,
+      "source": null
+    },
+    {
+      "frame": 22044,
+      "kind": "head_down",
+      "t_s": 23.69711641699996,
+      "reported_t_s": 24.70401554199998,
+      "foot": null,
+      "value": null,
+      "source": null
+    },
+    {
+      "frame": 22094,
+      "kind": "head_up",
+      "t_s": 26.36648358299999,
+      "reported_t_s": 26.36648358299999,
+      "foot": null,
+      "value": 2.669367166000029,
+      "source": null
+    },
+    {
+      "frame": 22275,
+      "kind": "head_down",
+      "t_s": 31.364980750000086,
+      "reported_t_s": 32.400231000000076,
+      "foot": null,
+      "value": null,
+      "source": null
+    },
+    {
+      "frame": 22279,
+      "kind": "head_up",
+      "t_s": 32.533072417000085,
+      "reported_t_s": 32.533072417000085,
+      "foot": null,
+      "value": 1.1680916669999988,
+      "source": null
+    },
+    {
+      "frame": 22370,
+      "kind": "head_down",
+      "t_s": 34.534993041999996,
+      "reported_t_s": 35.56666545799999,
+      "foot": null,
+      "value": null,
+      "source": null
+    }
+  ]
+}

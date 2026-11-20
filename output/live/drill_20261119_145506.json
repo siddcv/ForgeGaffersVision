@@ -1,0 +1,1285 @@
+{
+  "summary": {
+    "source": "0",
+    "recording": "data/clips/live/2026-11-19/drill_20261119_145506.mp4",
+    "overlay_video": "output/live/drill_20261119_145506_overlay.mp4",
+    "drill_s": 39.33,
+    "frame_size": [
+      1280,
+      720
+    ],
+    "orientation": "landscape",
+    "camera_fps": 30.0,
+    "processed_fps": 29.2,
+    "frames_processed": 1150,
+    "full_frame_runs": 148,
+    "clip_reader_behind_s": null,
+    "processing_ms": {
+      "median": 10.2,
+      "p90": 24.4
+    },
+    "feedback_lag_ms": {
+      "median": 10.3,
+      "p90": 34.6
+    },
+    "touch_left": 19,
+    "touch_right": 19,
+    "contact_left": 25,
+    "contact_right": 22,
+    "lost_control": 4,
+    "head_down": 2
+  },
+  "events": [
+    {
+      "frame": 548,
+      "kind": "contact",
+      "t_s": 0.7988487499999906,
+      "reported_t_s": 0.8317762500000185,
+      "foot": "left",
+      "value": null,
+      "source": null
+    },
+    {
+      "frame": 551,
+      "kind": "speed",
+      "t_s": 0.8317762500000185,
+      "reported_t_s": 0.9320659589999991,
+      "foot": "left",
+      "value": 1.2468599535666913,
+      "source": null
+    },
+    {
+      "frame": 554,
+      "kind": "head_down",
+      "t_s": 0.0,
+      "reported_t_s": 1.0305518750000147,
+      "foot": null,
+      "value": null,
+      "source": null
+    },
+    {
+      "frame": 562,
+      "kind": "contact",
+      "t_s": 1.2320886250000171,
+      "reported_t_s": 1.2992496670000264,
+      "foot": "right",
+      "value": null,
+      "source": null
+    },
+    {
+      "frame": 562,
+      "kind": "touch",
+      "t_s": 0.7988487499999906,
+      "reported_t_s": 1.2992496670000264,
+      "foot": "left",
+      "value": null,
+      "source": null
+    },
+    {
+      "frame": 566,
+      "kind": "speed",
+      "t_s": 1.2992496670000264,
+      "reported_t_s": 1.4320409590000054,
+      "foot": "right",
+      "value": 1.7155965047548034,
+      "source": null
+    },
+    {
+      "frame": 573,
+      "kind": "contact",
+      "t_s": 1.5651890839999965,
+      "reported_t_s": 1.6654398750000041,
+      "foot": "left",
+      "value": null,
+      "source": null
+    },
+    {
+      "frame": 573,
+      "kind": "touch",
+      "t_s": 1.2320886250000171,
+      "reported_t_s": 1.6654398750000041,
+      "foot": "right",
+      "value": null,
+      "source": null
+    },
+    {
+      "frame": 577,
+      "kind": "speed",
+      "t_s": 1.6654398750000041,
+      "reported_t_s": 1.799669042000005,
+      "foot": "left",
+      "value": 0.7285964263257994,
+      "source": null
+    },
+    {
+      "frame": 585,
+      "kind": "contact",
+      "t_s": 1.9674827919999984,
+      "reported_t_s": 2.066301875000022,
+      "foot": "right",
+      "value": null,
+      "source": null
+    },
+    {
+      "frame": 589,
+      "kind": "speed",
+      "t_s": 2.066301875000022,
+      "reported_t_s": 2.1999824590000117,
+      "foot": "right",
+      "value": 0.12563726857187354,
+      "source": null
+    },
+    {
+      "frame": 610,
+      "kind": "contact",
+      "t_s": 2.799652125000023,
+      "reported_t_s": 2.898883000000012,
+      "foot": "left",
+      "value": null,
+      "source": null
+    },
+    {
+      "frame": 610,
+      "kind": "touch",
+      "t_s": 1.9674827919999984,
+      "reported_t_s": 2.898883000000012,
+      "foot": "right",
+      "value": null,
+      "source": null
+    },
+    {
+      "frame": 613,
+      "kind": "speed",
+      "t_s": 2.898883000000012,
+      "reported_t_s": 2.99973595900002,
+      "foot": "left",
+      "value": 0.8694104357588462,
+      "source": null
+    },
+    {
+      "frame": 623,
+      "kind": "contact",
+      "t_s": 3.2658819170000015,
+      "reported_t_s": 3.332583542000009,
+      "foot": "right",
+      "value": null,
+      "source": null
+    },
+    {
+      "frame": 623,
+      "kind": "touch",
+      "t_s": 2.799652125000023,
+      "reported_t_s": 3.332583542000009,
+      "foot": "left",
+      "value": null,
+      "source": null
+    },
+    {
+      "frame": 626,
+      "kind": "speed",
+      "t_s": 3.332583542000009,
+      "reported_t_s": 3.4328910419999943,
+      "foot": "right",
+      "value": 1.5520781009426756,
+      "source": null
+    },
+    {
+      "frame": 634,
+      "kind": "contact",
+      "t_s": 3.666528625000012,
+      "reported_t_s": 3.6991989590000003,
+      "foot": "left",
+      "value": null,
+      "source": null
+    },
+    {
+      "frame": 634,
+      "kind": "touch",
+      "t_s": 3.2658819170000015,
+      "reported_t_s": 3.6991989590000003,
+      "foot": "right",
+      "value": null,
+      "source": null
+    },
+    {
+      "frame": 639,
+      "kind": "speed",
+      "t_s": 3.6991989590000003,
+      "reported_t_s": 3.8678538749999802,
+      "foot": "left",
+      "value": 1.19410230037681,
+      "source": null
+    },
+    {
+      "frame": 646,
+      "kind": "contact",
+      "t_s": 4.067396125000016,
+      "reported_t_s": 4.098768958999983,
+      "foot": "right",
+      "value": null,
+      "source": null
+    },
+    {
+      "frame": 646,
+      "kind": "touch",
+      "t_s": 3.666528625000012,
+      "reported_t_s": 4.098768958999983,
+      "foot": "left",
+      "value": null,
+      "source": null
+    },
+    {
+      "frame": 650,
+      "kind": "speed",
+      "t_s": 4.098768958999983,
+      "reported_t_s": 4.23303525,
+      "foot": "right",
+      "value": 1.0101471070802954,
+      "source": null
+    },
+    {
+      "frame": 658,
+      "kind": "contact",
+      "t_s": 4.467807875000005,
+      "reported_t_s": 4.497157042000026,
+      "foot": "left",
+      "value": null,
+      "source": null
+    },
+    {
+      "frame": 658,
+      "kind": "touch",
+      "t_s": 4.067396125000016,
+      "reported_t_s": 4.497157042000026,
+      "foot": "right",
+      "value": null,
+      "source": null
+    },
+    {
+      "frame": 661,
+      "kind": "speed",
+      "t_s": 4.497157042000026,
+      "reported_t_s": 4.6009917499999915,
+      "foot": "left",
+      "value": 1.4234857977556257,
+      "source": null
+    },
+    {
+      "frame": 670,
+      "kind": "contact",
+      "t_s": 4.834115750000024,
+      "reported_t_s": 4.8994982920000325,
+      "foot": "right",
+      "value": null,
+      "source": null
+    },
+    {
+      "frame": 670,
+      "kind": "touch",
+      "t_s": 4.467807875000005,
+      "reported_t_s": 4.8994982920000325,
+      "foot": "left",
+      "value": null,
+      "source": null
+    },
+    {
+      "frame": 673,
+      "kind": "speed",
+      "t_s": 4.8994982920000325,
+      "reported_t_s": 5.000678792000031,
+      "foot": "right",
+      "value": 1.6004943286585935,
+      "source": null
+    },
+    {
+      "frame": 681,
+      "kind": "contact",
+      "t_s": 5.197903999999994,
+      "reported_t_s": 5.267282625000007,
+      "foot": "left",
+      "value": null,
+      "source": null
+    },
+    {
+      "frame": 681,
+      "kind": "touch",
+      "t_s": 4.834115750000024,
+      "reported_t_s": 5.267282625000007,
+      "foot": "right",
+      "value": null,
+      "source": null
+    },
+    {
+      "frame": 684,
+      "kind": "speed",
+      "t_s": 5.267282625000007,
+      "reported_t_s": 5.367676667000012,
+      "foot": "left",
+      "value": 1.1635646065388128,
+      "source": null
+    },
+    {
+      "frame": 696,
+      "kind": "contact",
+      "t_s": 5.633867709000015,
+      "reported_t_s": 5.7668259999999805,
+      "foot": "right",
+      "value": null,
+      "source": null
+    },
+    {
+      "frame": 696,
+      "kind": "touch",
+      "t_s": 5.197903999999994,
+      "reported_t_s": 5.7668259999999805,
+      "foot": "left",
+      "value": null,
+      "source": null
+    },
+    {
+      "frame": 699,
+      "kind": "speed",
+      "t_s": 5.7668259999999805,
+      "reported_t_s": 5.867398917000003,
+      "foot": "right",
+      "value": 0.9668934943660101,
+      "source": null
+    },
+    {
+      "frame": 705,
+      "kind": "contact",
+      "t_s": 5.999538916999995,
+      "reported_t_s": 6.068349917000035,
+      "foot": "left",
+      "value": null,
+      "source": null
+    },
+    {
+      "frame": 705,
+      "kind": "touch",
+      "t_s": 5.633867709000015,
+      "reported_t_s": 6.068349917000035,
+      "foot": "right",
+      "value": null,
+      "source": null
+    },
+    {
+      "frame": 709,
+      "kind": "speed",
+      "t_s": 6.068349917000035,
+      "reported_t_s": 6.1986315839999975,
+      "foot": "left",
+      "value": 1.5500942505608823,
+      "source": null
+    },
+    {
+      "frame": 715,
+      "kind": "contact",
+      "t_s": 6.368866792000006,
+      "reported_t_s": 6.399332749999985,
+      "foot": "right",
+      "value": null,
+      "source": null
+    },
+    {
+      "frame": 715,
+      "kind": "touch",
+      "t_s": 5.999538916999995,
+      "reported_t_s": 6.399332749999985,
+      "foot": "left",
+      "value": null,
+      "source": null
+    },
+    {
+      "frame": 720,
+      "kind": "speed",
+      "t_s": 6.399332749999985,
+      "reported_t_s": 6.566668542000002,
+      "foot": "right",
+      "value": 2.129949342489162,
+      "source": null
+    },
+    {
+      "frame": 725,
+      "kind": "contact",
+      "t_s": 6.700313292000033,
+      "reported_t_s": 6.732975249999981,
+      "foot": "left",
+      "value": null,
+      "source": null
+    },
+    {
+      "frame": 725,
+      "kind": "touch",
+      "t_s": 6.368866792000006,
+      "reported_t_s": 6.732975249999981,
+      "foot": "right",
+      "value": null,
+      "source": null
+    },
+    {
+      "frame": 729,
+      "kind": "speed",
+      "t_s": 6.732975249999981,
+      "reported_t_s": 6.865846834000024,
+      "foot": "left",
+      "value": 1.8157055986064514,
+      "source": null
+    },
+    {
+      "frame": 737,
+      "kind": "contact",
+      "t_s": 7.064322167,
+      "reported_t_s": 7.132731834000026,
+      "foot": "right",
+      "value": null,
+      "source": null
+    },
+    {
+      "frame": 737,
+      "kind": "touch",
+      "t_s": 6.700313292000033,
+      "reported_t_s": 7.132731834000026,
+      "foot": "left",
+      "value": null,
+      "source": null
+    },
+    {
+      "frame": 742,
+      "kind": "speed",
+      "t_s": 7.132731834000026,
+      "reported_t_s": 7.299714417000018,
+      "foot": "right",
+      "value": 1.6607781132016142,
+      "source": null
+    },
+    {
+      "frame": 748,
+      "kind": "contact",
+      "t_s": 7.432948291999992,
+      "reported_t_s": 7.499208209000017,
+      "foot": "left",
+      "value": null,
+      "source": null
+    },
+    {
+      "frame": 748,
+      "kind": "touch",
+      "t_s": 7.064322167,
+      "reported_t_s": 7.499208209000017,
+      "foot": "right",
+      "value": null,
+      "source": null
+    },
+    {
+      "frame": 751,
+      "kind": "speed",
+      "t_s": 7.499208209000017,
+      "reported_t_s": 7.599672584000018,
+      "foot": "left",
+      "value": 1.019311351394451,
+      "source": null
+    },
+    {
+      "frame": 765,
+      "kind": "contact",
+      "t_s": 8.000077834000024,
+      "reported_t_s": 8.067519584000024,
+      "foot": "right",
+      "value": null,
+      "source": null
+    },
+    {
+      "frame": 765,
+      "kind": "touch",
+      "t_s": 7.432948291999992,
+      "reported_t_s": 8.067519584000024,
+      "foot": "left",
+      "value": null,
+      "source": null
+    },
+    {
+      "frame": 769,
+      "kind": "speed",
+      "t_s": 8.067519584000024,
+      "reported_t_s": 8.198915666999994,
+      "foot": "right",
+      "value": 0.707654450935775,
+      "source": null
+    },
+    {
+      "frame": 774,
+      "kind": "contact",
+      "t_s": 8.33235158399998,
+      "reported_t_s": 8.365917083999989,
+      "foot": "left",
+      "value": null,
+      "source": null
+    },
+    {
+      "frame": 774,
+      "kind": "lost_control",
+      "t_s": 7.432948291999992,
+      "reported_t_s": 8.365917083999989,
+      "foot": null,
+      "value": 0.567129542000032,
+      "source": "rhythm"
+    },
+    {
+      "frame": 777,
+      "kind": "speed",
+      "t_s": 8.365917083999989,
+      "reported_t_s": 8.46616716699998,
+      "foot": "left",
+      "value": 1.0934883877300758,
+      "source": null
+    },
+    {
+      "frame": 782,
+      "kind": "contact",
+      "t_s": 8.56539920900002,
+      "reported_t_s": 8.631525958999987,
+      "foot": "right",
+      "value": null,
+      "source": null
+    },
+    {
+      "frame": 782,
+      "kind": "touch",
+      "t_s": 8.33235158399998,
+      "reported_t_s": 8.631525958999987,
+      "foot": "left",
+      "value": null,
+      "source": null
+    },
+    {
+      "frame": 785,
+      "kind": "speed",
+      "t_s": 8.631525958999987,
+      "reported_t_s": 8.73338716699999,
+      "foot": "right",
+      "value": 0.30318497671172306,
+      "source": null
+    },
+    {
+      "frame": 792,
+      "kind": "contact",
+      "t_s": 8.866467499999999,
+      "reported_t_s": 8.965941750000013,
+      "foot": "left",
+      "value": null,
+      "source": null
+    },
+    {
+      "frame": 792,
+      "kind": "touch",
+      "t_s": 8.56539920900002,
+      "reported_t_s": 8.965941750000013,
+      "foot": "right",
+      "value": null,
+      "source": null
+    },
+    {
+      "frame": 795,
+      "kind": "speed",
+      "t_s": 8.965941750000013,
+      "reported_t_s": 9.06682783399998,
+      "foot": "left",
+      "value": 0.5003838104574811,
+      "source": null
+    },
+    {
+      "frame": 819,
+      "kind": "contact",
+      "t_s": 9.799053875000027,
+      "reported_t_s": 9.86646887500001,
+      "foot": "left",
+      "value": null,
+      "source": null
+    },
+    {
+      "frame": 824,
+      "kind": "speed",
+      "t_s": 9.86646887500001,
+      "reported_t_s": 10.032566374999988,
+      "foot": "left",
+      "value": 0.604593777381552,
+      "source": null
+    },
+    {
+      "frame": 885,
+      "kind": "contact",
+      "t_s": 11.962467000000004,
+      "reported_t_s": 12.065518084000018,
+      "foot": "left",
+      "value": null,
+      "source": null
+    },
+    {
+      "frame": 888,
+      "kind": "speed",
+      "t_s": 12.065518084000018,
+      "reported_t_s": 12.16688158400001,
+      "foot": "left",
+      "value": 0.22228042991793656,
+      "source": null
+    },
+    {
+      "frame": 1001,
+      "kind": "contact",
+      "t_s": 15.866851166999993,
+      "reported_t_s": 15.933522959000015,
+      "foot": "right",
+      "value": null,
+      "source": null
+    },
+    {
+      "frame": 1007,
+      "kind": "speed",
+      "t_s": 15.933522959000015,
+      "reported_t_s": 16.133121749999987,
+      "foot": "right",
+      "value": 0.8067848050218106,
+      "source": null
+    },
+    {
+      "frame": 1050,
+      "kind": "contact",
+      "t_s": 17.499409375000027,
+      "reported_t_s": 17.565782291999994,
+      "foot": "left",
+      "value": null,
+      "source": null
+    },
+    {
+      "frame": 1054,
+      "kind": "speed",
+      "t_s": 17.565782291999994,
+      "reported_t_s": 17.69944429200001,
+      "foot": "left",
+      "value": 1.0268764918484254,
+      "source": null
+    },
+    {
+      "frame": 1062,
+      "kind": "contact",
+      "t_s": 17.932139750000033,
+      "reported_t_s": 17.96690545900003,
+      "foot": "right",
+      "value": null,
+      "source": null
+    },
+    {
+      "frame": 1062,
+      "kind": "touch",
+      "t_s": 17.499409375000027,
+      "reported_t_s": 17.96690545900003,
+      "foot": "left",
+      "value": null,
+      "source": null
+    },
+    {
+      "frame": 1062,
+      "kind": "lost_control",
+      "t_s": 15.866851166999993,
+      "reported_t_s": 17.96690545900003,
+      "foot": null,
+      "value": 1.6325582080000345,
+      "source": "rhythm"
+    },
+    {
+      "frame": 1066,
+      "kind": "speed",
+      "t_s": 17.96690545900003,
+      "reported_t_s": 18.099664625000003,
+      "foot": "right",
+      "value": 1.6583737277778376,
+      "source": null
+    },
+    {
+      "frame": 1075,
+      "kind": "contact",
+      "t_s": 18.335205125000016,
+      "reported_t_s": 18.399714167000013,
+      "foot": "left",
+      "value": null,
+      "source": null
+    },
+    {
+      "frame": 1075,
+      "kind": "touch",
+      "t_s": 17.932139750000033,
+      "reported_t_s": 18.399714167000013,
+      "foot": "right",
+      "value": null,
+      "source": null
+    },
+    {
+      "frame": 1079,
+      "kind": "speed",
+      "t_s": 18.399714167000013,
+      "reported_t_s": 18.53446945899998,
+      "foot": "left",
+      "value": 0.9601453757992714,
+      "source": null
+    },
+    {
+      "frame": 1088,
+      "kind": "contact",
+      "t_s": 18.764603959,
+      "reported_t_s": 18.833100833999993,
+      "foot": "right",
+      "value": null,
+      "source": null
+    },
+    {
+      "frame": 1088,
+      "kind": "touch",
+      "t_s": 18.335205125000016,
+      "reported_t_s": 18.833100833999993,
+      "foot": "left",
+      "value": null,
+      "source": null
+    },
+    {
+      "frame": 1092,
+      "kind": "speed",
+      "t_s": 18.833100833999993,
+      "reported_t_s": 18.964950459000022,
+      "foot": "right",
+      "value": 1.295183802520256,
+      "source": null
+    },
+    {
+      "frame": 1098,
+      "kind": "contact",
+      "t_s": 19.099035291999996,
+      "reported_t_s": 19.165296084000033,
+      "foot": "left",
+      "value": null,
+      "source": null
+    },
+    {
+      "frame": 1098,
+      "kind": "touch",
+      "t_s": 18.764603959,
+      "reported_t_s": 19.165296084000033,
+      "foot": "right",
+      "value": null,
+      "source": null
+    },
+    {
+      "frame": 1101,
+      "kind": "speed",
+      "t_s": 19.165296084000033,
+      "reported_t_s": 19.26692704200002,
+      "foot": "left",
+      "value": 1.00487764968613,
+      "source": null
+    },
+    {
+      "frame": 1109,
+      "kind": "contact",
+      "t_s": 19.504111583999986,
+      "reported_t_s": 19.536360000000002,
+      "foot": "right",
+      "value": null,
+      "source": null
+    },
+    {
+      "frame": 1109,
+      "kind": "touch",
+      "t_s": 19.099035291999996,
+      "reported_t_s": 19.536360000000002,
+      "foot": "left",
+      "value": null,
+      "source": null
+    },
+    {
+      "frame": 1113,
+      "kind": "speed",
+      "t_s": 19.536360000000002,
+      "reported_t_s": 19.668502999999987,
+      "foot": "right",
+      "value": 0.7454576329963399,
+      "source": null
+    },
+    {
+      "frame": 1126,
+      "kind": "contact",
+      "t_s": 20.03314479200003,
+      "reported_t_s": 20.099604624999984,
+      "foot": "left",
+      "value": null,
+      "source": null
+    },
+    {
+      "frame": 1126,
+      "kind": "touch",
+      "t_s": 19.504111583999986,
+      "reported_t_s": 20.099604624999984,
+      "foot": "right",
+      "value": null,
+      "source": null
+    },
+    {
+      "frame": 1130,
+      "kind": "speed",
+      "t_s": 20.099604624999984,
+      "reported_t_s": 20.233153875000028,
+      "foot": "left",
+      "value": 1.583869668992549,
+      "source": null
+    },
+    {
+      "frame": 1135,
+      "kind": "contact",
+      "t_s": 20.332649375000017,
+      "reported_t_s": 20.399617708999983,
+      "foot": "right",
+      "value": null,
+      "source": null
+    },
+    {
+      "frame": 1135,
+      "kind": "touch",
+      "t_s": 20.03314479200003,
+      "reported_t_s": 20.399617708999983,
+      "foot": "left",
+      "value": null,
+      "source": null
+    },
+    {
+      "frame": 1138,
+      "kind": "speed",
+      "t_s": 20.399617708999983,
+      "reported_t_s": 20.49983900000001,
+      "foot": "right",
+      "value": 1.511818429658878,
+      "source": null
+    },
+    {
+      "frame": 1148,
+      "kind": "contact",
+      "t_s": 20.79994987499998,
+      "reported_t_s": 20.832474375000004,
+      "foot": "left",
+      "value": null,
+      "source": null
+    },
+    {
+      "frame": 1148,
+      "kind": "touch",
+      "t_s": 20.332649375000017,
+      "reported_t_s": 20.832474375000004,
+      "foot": "right",
+      "value": null,
+      "source": null
+    },
+    {
+      "frame": 1151,
+      "kind": "speed",
+      "t_s": 20.832474375000004,
+      "reported_t_s": 20.93351633399999,
+      "foot": "left",
+      "value": 0.9704547432114229,
+      "source": null
+    },
+    {
+      "frame": 1189,
+      "kind": "contact",
+      "t_s": 22.033730166999987,
+      "reported_t_s": 22.200474750000012,
+      "foot": "right",
+      "value": null,
+      "source": null
+    },
+    {
+      "frame": 1193,
+      "kind": "speed",
+      "t_s": 22.200474750000012,
+      "reported_t_s": 22.3341585,
+      "foot": "right",
+      "value": 1.4701494790141745,
+      "source": null
+    },
+    {
+      "frame": 1197,
+      "kind": "contact",
+      "t_s": 22.433211125000014,
+      "reported_t_s": 22.466622416999996,
+      "foot": "left",
+      "value": null,
+      "source": null
+    },
+    {
+      "frame": 1197,
+      "kind": "touch",
+      "t_s": 22.033730166999987,
+      "reported_t_s": 22.466622416999996,
+      "foot": "right",
+      "value": null,
+      "source": null
+    },
+    {
+      "frame": 1197,
+      "kind": "lost_control",
+      "t_s": 20.79994987499998,
+      "reported_t_s": 22.466622416999996,
+      "foot": null,
+      "value": 1.2337802920000058,
+      "source": "rhythm"
+    },
+    {
+      "frame": 1201,
+      "kind": "speed",
+      "t_s": 22.466622416999996,
+      "reported_t_s": 22.600461709,
+      "foot": "left",
+      "value": 2.052337263034667,
+      "source": null
+    },
+    {
+      "frame": 1210,
+      "kind": "contact",
+      "t_s": 22.86723225000003,
+      "reported_t_s": 22.89952875,
+      "foot": "right",
+      "value": null,
+      "source": null
+    },
+    {
+      "frame": 1210,
+      "kind": "touch",
+      "t_s": 22.433211125000014,
+      "reported_t_s": 22.89952875,
+      "foot": "left",
+      "value": null,
+      "source": null
+    },
+    {
+      "frame": 1213,
+      "kind": "speed",
+      "t_s": 22.89952875,
+      "reported_t_s": 22.999894625000024,
+      "foot": "right",
+      "value": 1.0291277715869853,
+      "source": null
+    },
+    {
+      "frame": 1230,
+      "kind": "contact",
+      "t_s": 23.535316334000015,
+      "reported_t_s": 23.563933125000005,
+      "foot": "left",
+      "value": null,
+      "source": null
+    },
+    {
+      "frame": 1230,
+      "kind": "touch",
+      "t_s": 22.86723225000003,
+      "reported_t_s": 23.563933125000005,
+      "foot": "right",
+      "value": null,
+      "source": null
+    },
+    {
+      "frame": 1240,
+      "kind": "speed",
+      "t_s": 23.563933125000005,
+      "reported_t_s": 23.89884833399998,
+      "foot": "left",
+      "value": 1.9093302232214362,
+      "source": null
+    },
+    {
+      "frame": 1253,
+      "kind": "contact",
+      "t_s": 24.26677545900003,
+      "reported_t_s": 24.365958792000015,
+      "foot": "right",
+      "value": null,
+      "source": null
+    },
+    {
+      "frame": 1253,
+      "kind": "touch",
+      "t_s": 23.535316334000015,
+      "reported_t_s": 24.365958792000015,
+      "foot": "left",
+      "value": null,
+      "source": null
+    },
+    {
+      "frame": 1255,
+      "kind": "speed",
+      "t_s": 24.365958792000015,
+      "reported_t_s": 24.499228834000007,
+      "foot": "right",
+      "value": 0.29008696976668996,
+      "source": null
+    },
+    {
+      "frame": 1287,
+      "kind": "head_up",
+      "t_s": 25.56508979199998,
+      "reported_t_s": 25.56508979199998,
+      "foot": null,
+      "value": 25.56508979199998,
+      "source": null
+    },
+    {
+      "frame": 1359,
+      "kind": "head_down",
+      "t_s": 26.965947959000005,
+      "reported_t_s": 27.966235374999997,
+      "foot": null,
+      "value": null,
+      "source": null
+    },
+    {
+      "frame": 1403,
+      "kind": "contact",
+      "t_s": 29.36664841700002,
+      "reported_t_s": 29.432926500000008,
+      "foot": "left",
+      "value": null,
+      "source": null
+    },
+    {
+      "frame": 1406,
+      "kind": "speed",
+      "t_s": 29.432926500000008,
+      "reported_t_s": 29.533557667000025,
+      "foot": "left",
+      "value": 1.2815574949162178,
+      "source": null
+    },
+    {
+      "frame": 1416,
+      "kind": "contact",
+      "t_s": 29.800246458999993,
+      "reported_t_s": 29.867268459,
+      "foot": "right",
+      "value": null,
+      "source": null
+    },
+    {
+      "frame": 1416,
+      "kind": "touch",
+      "t_s": 29.36664841700002,
+      "reported_t_s": 29.867268459,
+      "foot": "left",
+      "value": null,
+      "source": null
+    },
+    {
+      "frame": 1420,
+      "kind": "speed",
+      "t_s": 29.867268459,
+      "reported_t_s": 30.000881833999983,
+      "foot": "right",
+      "value": 1.1463178149323916,
+      "source": null
+    },
+    {
+      "frame": 1427,
+      "kind": "contact",
+      "t_s": 30.201698249999993,
+      "reported_t_s": 30.23222579200001,
+      "foot": "left",
+      "value": null,
+      "source": null
+    },
+    {
+      "frame": 1427,
+      "kind": "touch",
+      "t_s": 29.800246458999993,
+      "reported_t_s": 30.23222579200001,
+      "foot": "right",
+      "value": null,
+      "source": null
+    },
+    {
+      "frame": 1430,
+      "kind": "speed",
+      "t_s": 30.23222579200001,
+      "reported_t_s": 30.333583250000004,
+      "foot": "left",
+      "value": 1.2338116507196006,
+      "source": null
+    },
+    {
+      "frame": 1439,
+      "kind": "contact",
+      "t_s": 30.53248104200003,
+      "reported_t_s": 30.631881292000003,
+      "foot": "right",
+      "value": null,
+      "source": null
+    },
+    {
+      "frame": 1439,
+      "kind": "touch",
+      "t_s": 30.201698249999993,
+      "reported_t_s": 30.631881292000003,
+      "foot": "left",
+      "value": null,
+      "source": null
+    },
+    {
+      "frame": 1442,
+      "kind": "speed",
+      "t_s": 30.631881292000003,
+      "reported_t_s": 30.73245083400002,
+      "foot": "right",
+      "value": 1.5307456871212872,
+      "source": null
+    },
+    {
+      "frame": 1449,
+      "kind": "contact",
+      "t_s": 30.936509709000006,
+      "reported_t_s": 30.967869542000017,
+      "foot": "left",
+      "value": null,
+      "source": null
+    },
+    {
+      "frame": 1449,
+      "kind": "touch",
+      "t_s": 30.53248104200003,
+      "reported_t_s": 30.967869542000017,
+      "foot": "right",
+      "value": null,
+      "source": null
+    },
+    {
+      "frame": 1453,
+      "kind": "speed",
+      "t_s": 30.967869542000017,
+      "reported_t_s": 31.099127124999995,
+      "foot": "left",
+      "value": 1.030138781443827,
+      "source": null
+    },
+    {
+      "frame": 1463,
+      "kind": "contact",
+      "t_s": 31.40063891699998,
+      "reported_t_s": 31.433127249999984,
+      "foot": "right",
+      "value": null,
+      "source": null
+    },
+    {
+      "frame": 1463,
+      "kind": "touch",
+      "t_s": 30.936509709000006,
+      "reported_t_s": 31.433127249999984,
+      "foot": "left",
+      "value": null,
+      "source": null
+    },
+    {
+      "frame": 1466,
+      "kind": "speed",
+      "t_s": 31.433127249999984,
+      "reported_t_s": 31.53456245900003,
+      "foot": "right",
+      "value": 1.4867967184631026,
+      "source": null
+    },
+    {
+      "frame": 1473,
+      "kind": "contact",
+      "t_s": 31.735520000000008,
+      "reported_t_s": 31.76567675000001,
+      "foot": "left",
+      "value": null,
+      "source": null
+    },
+    {
+      "frame": 1473,
+      "kind": "touch",
+      "t_s": 31.40063891699998,
+      "reported_t_s": 31.76567675000001,
+      "foot": "right",
+      "value": null,
+      "source": null
+    },
+    {
+      "frame": 1476,
+      "kind": "speed",
+      "t_s": 31.76567675000001,
+      "reported_t_s": 31.86645283400003,
+      "foot": "left",
+      "value": 1.7910651702207716,
+      "source": null
+    },
+    {
+      "frame": 1485,
+      "kind": "contact",
+      "t_s": 32.13539383400001,
+      "reported_t_s": 32.164086209000004,
+      "foot": "right",
+      "value": null,
+      "source": null
+    },
+    {
+      "frame": 1485,
+      "kind": "touch",
+      "t_s": 31.735520000000008,
+      "reported_t_s": 32.164086209000004,
+      "foot": "left",
+      "value": null,
+      "source": null
+    },
+    {
+      "frame": 1488,
+      "kind": "speed",
+      "t_s": 32.164086209000004,
+      "reported_t_s": 32.26542983400003,
+      "foot": "right",
+      "value": 1.731421010594718,
+      "source": null
+    },
+    {
+      "frame": 1497,
+      "kind": "contact",
+      "t_s": 32.532650666999984,
+      "reported_t_s": 32.56498158400001,
+      "foot": "left",
+      "value": null,
+      "source": null
+    },
+    {
+      "frame": 1497,
+      "kind": "touch",
+      "t_s": 32.13539383400001,
+      "reported_t_s": 32.56498158400001,
+      "foot": "right",
+      "value": null,
+      "source": null
+    },
+    {
+      "frame": 1500,
+      "kind": "speed",
+      "t_s": 32.56498158400001,
+      "reported_t_s": 32.66563429199999,
+      "foot": "left",
+      "value": 2.928775067358706,
+      "source": null
+    },
+    {
+      "frame": 1532,
+      "kind": "lost_control",
+      "t_s": 33.101840125000024,
+      "reported_t_s": 33.734967375,
+      "foot": null,
+      "value": null,
+      "source": "spatial"
+    }
+  ]
+}
