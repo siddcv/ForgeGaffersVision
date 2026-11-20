@@ -7,8 +7,12 @@ behind the camera: frames that arrive while one is being processed are skipped (
 recorded). The metric thresholds are in seconds, so skipped frames do not change their meaning.
 Laptop speed says nothing about a phone; use this to feel the feedback and try camera placement.
 
-Drills: the window opens in READY (overlay running, nothing counted). START (click the button or
-press space) counts down, then resets the counts and starts the drill; STOP ends it. Each drill
+Drills: the window opens in READY (overlay running, nothing counted). START stays grey, with the
+reason shown above it, until the whole player (head to toe) and the ball have been in frame for
+framing_hold_s (--no-framing-check skips this). START (click the button or press space) counts
+down, then resets the counts and starts the drill; STOP ends it. During the countdown and the
+drill, RECENTER YOURSELF shows while the player's head or feet are out of frame (nothing pauses;
+the ball leaving the frame is lost control, not a framing problem). Each drill
 from a camera is recorded to data/clips/live/<date>/drill_<date>_<time>.mp4 with a timestamps sidecar
 holding each frame's real capture time, and its summary goes to output/live/drill_<date>_<time>.json,
 with times from the drill's first frame, so it can be labelled (src.label_clip), replayed
@@ -41,7 +45,7 @@ from .onnx_detector import OnnxBallDetector, export_onnx
 from .overlay import Hud, draw
 from .face_pose import open_head_pitch_sampler
 from .pipeline import POSE_PITCH, FramePipeline
-from .pose import PoseEstimator
+from .pose import FACE, LEFT_FOOT, RIGHT_FOOT, PoseEstimator
 from .video_io import iter_frames, timestamps_path
 
 WINDOW = "Gaffer's Vision live"
@@ -67,6 +71,73 @@ def camera_report(frame_size, reported_fps: float) -> str:
         text += ("  WARNING: landscape. Set the phone-as-webcam app to portrait, or if the picture is "
                  "on its side add --rotate 90 (or 270).")
     return text
+
+
+def framing_problems(landmarks, ball, width: int, height: int, cfg) -> list[str]:
+    """What keeps the player and ball from being fully in frame; empty when they are.
+
+    Checks the head (face landmarks, plus an estimate of the top of the head), both feet (heels
+    and toes) and the detected ball box, each inside the frame with a margin at every edge.
+    Off-frame landmarks come back from pose with low visibility, or with coordinates past the
+    edge, so both are treated as not in frame.
+    """
+    margin_x, margin_y = cfg.framing_margin_frac * width, cfg.framing_margin_frac * height
+
+    def inside(x, y) -> bool:
+        return margin_x <= x <= width - margin_x and margin_y <= y <= height - margin_y
+
+    def visible(i) -> bool:
+        return bool(landmarks[i, 2] >= cfg.pose_min_visibility)  # False for NaN (no person)
+
+    problems = []
+    if not any(visible(i) for i in range(len(landmarks))):
+        return ["no player found"]
+    face = [i for i in FACE if visible(i)]
+    if not face:
+        problems.append("head not in frame")
+    else:
+        xs, ys = [landmarks[i, 0] for i in face], [landmarks[i, 1] for i in face]
+        face_width = max(xs) - min(xs)
+        head_top = min(ys) - cfg.framing_head_top_frac * face_width
+        if not all(inside(x, y) for x, y in zip(xs, ys)) or head_top < margin_y:
+            problems.append("head not in frame")
+    for name, foot in (("left foot", LEFT_FOOT), ("right foot", RIGHT_FOOT)):
+        if not all(visible(i) and inside(landmarks[i, 0], landmarks[i, 1]) for i in foot):
+            problems.append(f"{name} not in frame")
+    if ball is None:
+        problems.append("ball not found")
+    elif not (inside(ball[0], ball[1]) and inside(ball[2], ball[3])):
+        problems.append("ball not in frame")
+    return problems
+
+
+class FramingGate:
+    """Enables START once the player and ball have been fully in frame for framing_hold_s, and
+    disables it after they have been out for framing_grace_s, so a single missed detection (the
+    ball hidden by a foot for a frame) does not make the button flicker.
+
+    During a drill the same gate, started as ready (START needed the player in frame), drives the
+    RECENTER YOURSELF warning: shown while not ready."""
+
+    def __init__(self, cfg, ready: bool = False):
+        self.cfg = cfg
+        self.ready = ready
+        self.problems = [] if ready else ["no player found"]
+        self._since = None  # when the current in-frame or out-of-frame run began
+
+    def update(self, t_s: float, problems: list[str]) -> bool:
+        in_frame = not problems
+        if problems:
+            self.problems = problems
+        if in_frame != self.ready:
+            if self._since is None:
+                self._since = t_s
+            wait = self.cfg.framing_hold_s if in_frame else self.cfg.framing_grace_s
+            if t_s - self._since >= wait:
+                self.ready, self._since = in_frame, None
+        else:
+            self._since = None
+        return self.ready
 
 
 # Tried in order: the first the local OpenCV build can open is used. mp4v is the usual choice;
@@ -337,6 +408,34 @@ def draw_banner(image, text: str, color: tuple) -> None:
     cv2.putText(image, text, (x, 42), cv2.FONT_HERSHEY_SIMPLEX, 0.8, color, 2)
 
 
+def body_problems(problems: list[str]) -> list[str]:
+    """The framing problems about the player (head, feet), leaving out the ball's."""
+    return [p for p in problems if not p.startswith("ball")]
+
+
+def draw_recenter(image, problems: list[str]) -> None:
+    """Mid-drill warning a third of the way down (below the counts, above the countdown digit):
+    RECENTER YOURSELF, and what is out of frame."""
+    height, width = image.shape[:2]
+    y = height // 3
+    for text, scale, thickness, y in (("RECENTER YOURSELF", 1.3, 3, y), (", ".join(problems), 0.8, 2, y + 40)):
+        (text_w, _), _ = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, scale, thickness)
+        origin = (max(10, (width - text_w) // 2), y)
+        cv2.putText(image, text, origin, cv2.FONT_HERSHEY_SIMPLEX, scale, (0, 0, 0), thickness + 4)
+        cv2.putText(image, text, origin, cv2.FONT_HERSHEY_SIMPLEX, scale, (0, 200, 255), thickness)
+
+
+def draw_framing_hint(image, problems: list[str]) -> None:
+    """Why START is disabled, above the button: 'Fit head to toe and the ball: right foot not in frame'."""
+    height, width = image.shape[:2]
+    lines = ["Fit head to toe and the ball in frame", ", ".join(problems)]
+    for i, text in enumerate(lines):
+        (text_w, _), _ = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, 0.7, 2)
+        origin = (max(10, width - text_w - 20), height - 175 + 30 * i)
+        cv2.putText(image, text, origin, cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 0), 5)
+        cv2.putText(image, text, origin, cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 200, 255), 2)
+
+
 def draw_countdown(image, seconds_left: float) -> None:
     height, width = image.shape[:2]
     text = str(max(1, int(seconds_left + 0.999)))
@@ -411,6 +510,7 @@ class Drill:
         self.overlay = OverlayRecorder(Path("output") / "live" / f"{name}_overlay.mp4") if save_overlay else None
         self.proc_ms, self.lag_ms, self.events = [], [], []
         self.full_frame_runs = 0
+        self.recenter_warnings = 0  # times the head or feet went out of frame mid-drill
         self.last_t = 0.0
         self.started = datetime.now()
 
@@ -455,6 +555,7 @@ def save_drill(drill: Drill, recording: Path | None, source: "FrameSource", args
         "processed_fps": round(len(drill.proc_ms) / drill.last_t, 1) if drill.last_t else None,
         "frames_processed": len(drill.proc_ms),
         "full_frame_runs": drill.full_frame_runs,
+        "recenter_warnings": drill.recenter_warnings,
         "clip_reader_behind_s": None if is_camera else round(source.behind_s, 2),
         "processing_ms": summary_stats(drill.proc_ms),
         "feedback_lag_ms": summary_stats(drill.lag_ms),
@@ -497,6 +598,8 @@ def main() -> None:
                         help="add a row per recorded drill here ('' to skip)")
     parser.add_argument("--no-overlay-video", action="store_true",
                         help="do not save the window's view (output/live/drill_<date>_<time>_overlay.mp4)")
+    parser.add_argument("--no-framing-check", action="store_true",
+                        help="enable START without waiting for the player and ball to be fully in frame")
     parser.add_argument("--no-window", action="store_true", help="no display, e.g. for a timing run")
     parser.add_argument("--max-seconds", type=float, help="stop after this long")
     args = parser.parse_args()
@@ -523,6 +626,8 @@ def main() -> None:
     preview = FramePipeline(cfg)  # keeps the overlay (feet, ball) running between drills; never counts
     preview_hud = Hud()
     button = DrillButton()
+    framing = FramingGate(cfg)  # READY: enables START
+    recenter = FramingGate(cfg, ready=True)  # countdown and drill: RECENTER YOURSELF while not ready
     if not args.no_window:
         cv2.namedWindow(WINDOW)
         cv2.setMouseCallback(WINDOW, button.on_mouse)
@@ -569,6 +674,15 @@ def main() -> None:
             head_pitch = head_sampler.update(bgr, landmarks, t_s, t_ms) if head_sampler else POSE_PITCH
             record = pipeline.step(t_used, landmarks, crop, crop_candidates,
                                    lambda: detector.detect(bgr, cfg.full_imgsz), head_pitch)
+            problems = framing_problems(landmarks, record["ball"], width, height, cfg)
+            if state == "ready":
+                framing.update(t_s, problems)
+            else:  # countdown or drill: warn about the body only; a lost ball is lost control
+                was_in_frame = recenter.ready
+                recenter.update(t_s, body_problems(problems))
+                if counting and was_in_frame and not recenter.ready:
+                    drill.recenter_warnings += 1
+            start_enabled = args.no_framing_check or framing.ready
             proc = (time.perf_counter() - start) * 1000
             lag = (time.perf_counter() - arrival) * 1000
             processed += 1
@@ -587,17 +701,25 @@ def main() -> None:
             draw(view, record, landmarks, drill.hud if counting else preview_hud, cfg, t_used)
             draw_status(view, statistics.median(recent_proc), lag, processed, source.grabbed)
             view = fit(view, DISPLAY_MAX_PX)
-            if state == "ready":
+            if state == "ready" and start_enabled:
                 draw_banner(view, "READY", (255, 255, 255))
                 button.draw(view, "START", (0, 150, 0))
+            elif state == "ready":
+                draw_banner(view, "STEP INTO FRAME", (0, 200, 255))
+                draw_framing_hint(view, framing.problems)
+                button.draw(view, "START", (110, 110, 110))
             elif state == "countdown":
                 draw_countdown(view, countdown_end - time.perf_counter())
                 button.draw(view, "CANCEL", (0, 140, 255))
+                if not recenter.ready:
+                    draw_recenter(view, recenter.problems)
             else:
                 recording = source.recording_path is not None
                 draw_banner(view, f"{'REC' if recording else 'DRILL'} {minutes(drill.last_t)}",
                             (0, 0, 255) if recording else (255, 255, 255))
                 button.draw(view, "STOP", (0, 0, 200))
+                if not recenter.ready:
+                    draw_recenter(view, recenter.problems)
                 if counting and drill.overlay is not None:
                     drill.overlay.add(view, t_used)
             cv2.imshow(WINDOW, view)
@@ -606,8 +728,11 @@ def main() -> None:
                 break
             if key == ord(" ") or button.clicked:
                 button.clicked = False
-                if state == "ready":
+                if state == "ready" and not start_enabled:
+                    pass  # START is disabled until the player and ball are fully in frame
+                elif state == "ready":
                     state, countdown_end = "countdown", time.perf_counter() + args.countdown
+                    recenter = FramingGate(cfg, ready=True)
                 elif state == "countdown":
                     state = "ready"
                 else:

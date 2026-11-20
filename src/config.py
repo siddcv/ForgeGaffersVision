@@ -103,6 +103,15 @@ class Config:
     # Pose
     pose_min_visibility: float = 0.5
     head_box_padding: float = 0.5
+
+    # Live framing check (live.py): START stays disabled until the whole player (head to toe)
+    # and the ball are inside the frame, away from its edges.
+    framing_margin_frac: float = 0.02  # keep this fraction of the frame size clear at every edge
+    # The top of the head is estimated above the highest face landmark (eyes), by this fraction
+    # of the face's width: pose has no landmark on the top of the head.
+    framing_head_top_frac: float = 0.8
+    framing_hold_s: float = 0.5  # all in frame this long before START is enabled
+    framing_grace_s: float = 0.5  # out of frame this long before START is disabled again
  
     # Filters
     kalman_process_noise: float = 4.0e6

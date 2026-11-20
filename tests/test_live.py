@@ -178,3 +178,80 @@ def test_recorded_drill_gets_a_manifest_row(tmp_path):
     assert (new["clip"], new["session"], new["date"]) == ("drill_20261119_101500", "2026-11-19_live", "2026-11-19")
     assert (new["fps"], new["resolution"], new["orientation"]) == ("30", "720x1280", "portrait")
     assert (new["drill_start_s"], new["drill_end_s"], new["split"]) == ("0", "21.37", "")
+
+
+def standing_player(width=720, height=1280):
+    """Landmarks of a player standing in the middle of a portrait frame, every point visible."""
+    from src.pose import FACE, LEFT_FOOT, RIGHT_FOOT
+    landmarks = np.full((33, 3), [width / 2, height / 2, 0.9])
+    for k, i in enumerate(FACE):  # face around (360, 200), 60 px wide
+        landmarks[i, :2] = width / 2 - 30 + 6 * k, 200 + (k % 3) * 5
+    for i, x in zip(LEFT_FOOT + RIGHT_FOOT, (420, 440, 300, 280)):
+        landmarks[i, :2] = x, 1150
+    return landmarks
+
+
+BALL = (340, 1100, 380, 1140, 0.8)
+
+
+def test_framing_ok_when_head_feet_and_ball_are_in_frame():
+    from src.config import Config
+    from src.live import framing_problems
+    assert framing_problems(standing_player(), BALL, 720, 1280, Config()) == []
+
+
+def test_framing_reports_each_missing_part():
+    from src.config import Config
+    from src.live import framing_problems
+    from src.pose import LEFT_TOE, RIGHT_HEEL
+    cfg = Config()
+    no_person = np.full((33, 3), np.nan)
+    assert framing_problems(no_person, BALL, 720, 1280, cfg) == ["no player found"]
+
+    cut_feet = standing_player()
+    cut_feet[LEFT_TOE, 1] = 1290  # past the bottom edge
+    cut_feet[RIGHT_HEEL, 2] = 0.1  # pose unsure: off frame or hidden
+    assert framing_problems(cut_feet, BALL, 720, 1280, cfg) == ["left foot not in frame", "right foot not in frame"]
+
+    head_cut = standing_player()
+    head_cut[:11, 1] -= 160  # eyes at ~40 px: the top of the head is above the frame
+    assert framing_problems(head_cut, BALL, 720, 1280, cfg) == ["head not in frame"]
+    no_face = standing_player()
+    no_face[:11, 2] = 0.0
+    assert "head not in frame" in framing_problems(no_face, BALL, 720, 1280, cfg)
+
+    assert framing_problems(standing_player(), None, 720, 1280, cfg) == ["ball not found"]
+    edge_ball = (690, 1100, 730, 1140, 0.8)
+    assert framing_problems(standing_player(), edge_ball, 720, 1280, cfg) == ["ball not in frame"]
+
+
+def test_framing_gate_waits_before_enabling_and_ignores_brief_misses():
+    from src.config import Config
+    from src.live import FramingGate
+    cfg = Config(framing_hold_s=0.5, framing_grace_s=0.5)
+    gate = FramingGate(cfg)
+    t = [i / 30 for i in range(120)]
+    assert not gate.update(t[0], [])
+    assert not gate.update(t[10], [])  # 0.33 s in frame
+    assert gate.update(t[16], [])  # 0.53 s
+    assert gate.update(t[17], ["ball not found"])  # one missed frame: still enabled
+    assert gate.update(t[18], [])
+    assert gate.update(t[20], ["right foot not in frame"])
+    assert gate.update(t[30], ["right foot not in frame"])  # 0.33 s out
+    assert not gate.update(t[36], ["right foot not in frame"])  # 0.53 s out: disabled
+    assert gate.problems == ["right foot not in frame"]
+
+
+def test_recenter_warning_is_about_the_body_and_waits_before_showing():
+    from src.config import Config
+    from src.live import FramingGate, body_problems
+    assert body_problems(["left foot not in frame", "ball not found", "ball not in frame"]) == ["left foot not in frame"]
+    assert body_problems(["ball not found"]) == []  # a lost ball is lost control, not a framing problem
+    recenter = FramingGate(Config(framing_hold_s=0.5, framing_grace_s=0.5), ready=True)
+    assert recenter.ready and recenter.problems == []  # the drill starts in frame (START needed it)
+    assert recenter.update(0.0, ["head not in frame"])
+    assert recenter.update(0.3, ["head not in frame"])  # brief: no warning yet
+    assert not recenter.update(0.6, ["head not in frame"])  # out 0.6 s: RECENTER YOURSELF
+    assert not recenter.update(0.8, [])
+    assert not recenter.update(1.2, [])  # back 0.4 s: still shown
+    assert recenter.update(1.4, [])  # back 0.6 s: warning cleared
