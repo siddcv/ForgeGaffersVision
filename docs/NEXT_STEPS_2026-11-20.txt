@@ -1,0 +1,121 @@
+GAFFER'S VISION: STEPS FOR 2026-11-20
+=====================================
+Where we are: docs/IOS_PORT_PLAN.md (progress table at the top).
+Live recording setup in detail: docs/LIVE_RECORDING_SETUP.txt (on develop).
+
+
+A. TEAMMATE'S MAC: LIVE DRILLS (about 1-1.5 h)
+----------------------------------------------
+1. Get the latest code (the drills use develop; the Swift work on swift-core is not needed):
+
+     cd ForgeGaffersVision
+     git fetch
+     git switch develop
+     git pull
+     source ~/.venvs/gaffers-vision/bin/activate
+
+2. Open Camo on the phone and the Mac, then start live mode:
+
+     python -m src.live --source 0
+
+   - If it shows the Mac's own camera, try --source 1 or --source 2.
+   - The terminal prints "Camera: W x H (portrait/landscape) ... delivering N fps".
+   - If it says landscape, fix it BEFORE recording: switch Camo to portrait,
+     or add --rotate 90 (or 270) if the picture is on its side.
+   - Left-foot check: tap with only the left foot; the LEFT contact count must go up.
+     If RIGHT goes up instead, add --flip.
+
+3. Camera setup: phone low (knee to hip height), 2-3 m in front, legs and ball always
+   in frame. Write down the height and distance in metres.
+
+4. Record 3-4 drills of about 20 s each:
+   - Click START, wait for 3-2-1, do the drill, click STOP.
+   - Someone counts tick-tocks by hand. Write down the hand count and the drill's
+     file name (printed in the terminal at STOP).
+   - Note the fps and lag from the status line.
+
+5. One drill of deliberate edge cases: lose the ball, pause with the ball still between
+   the feet, a few same-foot doubles, look down for over 1 s.
+
+6. Head-down calibration: write down the pitch number shown when the player looks
+   straight ahead, and when they look at the ball.
+
+7. Check the files exist:
+
+     ls -R data/clips/live
+     ls output/live
+
+   Each drill should have drill_<date>_<time>.mp4, a .timestamps.csv,
+   an _overlay.mp4 and a .json.
+
+8. Send back: the .mp4 and .timestamps.csv files from data/clips/live/<date>/,
+   the output/live/*.json files, the notes from steps 3-6, and data/manifest.csv
+   (or commit it). Use a cable, AirDrop or a shared drive, not a messaging app
+   (they re-compress video).
+
+
+B. TEAMMATE'S MAC: PHONE-APP PREP (can run alongside A)
+-------------------------------------------------------
+9.  Start the Xcode download from the Mac App Store now (about 10-15 GB, needs admin rights).
+
+10. Core ML export (does not need Xcode):
+
+      pip install coremltools
+      python -m scripts.export_coreml
+
+    Keep models/yolov8n_320.mlpackage, models/yolov8n_640.mlpackage
+    and output/coreml_check.json.
+
+11. Once Xcode is installed:
+    - Sign in with an Apple ID: Xcode > Settings > Accounts (a free Apple ID is enough).
+    - Plug in an iPhone and turn on Settings > Privacy & Security > Developer Mode
+      (the phone restarts).
+    - Check the Swift logic works on the Mac:
+
+        git switch swift-core
+        cd swift/GaffersVisionCore
+        swift test
+
+      Expected: 5 tests, 0 failures.
+
+12. First iPhone speed number:
+    - Open models/yolov8n_320.mlpackage in Xcode, choose the connected iPhone, open the
+      Performance tab and run it. Note the ms per prediction and whether it runs on the
+      Neural Engine.
+    - Optional: build Google's MediaPipe Pose Landmarker iOS sample (the mediapipe-samples
+      repository on GitHub) onto the iPhone and note its speed.
+
+
+C. ME (SIDDHARTH)
+-----------------
+13. Label each recorded drill (touches first):
+
+      python -m src.label_clip data/clips/live/<date>/drill_<date>_<time>.mp4 --focus touches
+
+14. Score each drill:
+
+      python -m src.evaluate_live output/live/drill_<date>_<time>.json
+
+    The first run builds a cache (a few minutes per drill). Compare the "live" and
+    "replay" columns, and note the errors marked "live only" and "both".
+
+15. File the drills: move each .mp4 and its .timestamps.csv into
+    data/clips/tune/<date>_<place>/ (hold one session back in data/clips/test/ if
+    there is enough). Fill in the blanks in each drill's manifest row (player, camera
+    height and distance, lighting, split).
+
+16. Push swift-core (git push). Open a PR into develop if the Swift package should be there too.
+
+17. Team decisions:
+    - what the live screen shows, given the ~0.4 s tick-tock delay
+    - detector licence: YOLOv8n (AGPL) vs YOLOX-nano (Apache)
+    - who builds the iOS test app on the Mac
+
+
+D. CLAUDE, AFTER THE DRILLS
+---------------------------
+- Read the drill scores and fix what they point to: foot attribution far from the ball,
+  the first touch from a still ball, anything new. Each fix is scored on all clips, then
+  the test vectors are regenerated and the Swift port updated.
+- If the Core ML and pose numbers look fast enough, write step 1 of the iPhone test app
+  (camera, MediaPipe pose, live skeleton) for whoever builds it on the Mac.
