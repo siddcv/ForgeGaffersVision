@@ -1,0 +1,8 @@
+# Generated on the Mac by xcodegen and pod install (see README.md)
+GaffersVision.xcodeproj/
+GaffersVision.xcworkspace/
+GaffersVision/Info.plist
+Pods/
+build/
+DerivedData/
+xcuserdata/

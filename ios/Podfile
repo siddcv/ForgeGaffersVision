@@ -1,0 +1,16 @@
+# MediaPipe's iOS libraries are published as CocoaPods. Pinned; if `pod install` cannot find this
+# version, run `pod search MediaPipeTasksVision` and pin the newest one listed.
+platform :ios, '17.0'
+
+target 'GaffersVision' do
+  use_frameworks!
+  pod 'MediaPipeTasksVision', '0.10.21'
+end
+
+post_install do |installer|
+  installer.pods_project.targets.each do |target|
+    target.build_configurations.each do |config|
+      config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '17.0'
+    end
+  end
+end
