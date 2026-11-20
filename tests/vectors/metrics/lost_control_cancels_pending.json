@@ -19,6 +19,12 @@
   "touch_pace_min_s": 3.0,
   "lost_distance_diam": 1.5,
   "lost_control_min_s": 0.5,
+  "ball_loss_baseline_s": 4.0,
+  "ball_loss_drop_frac": 0.3,
+  "ball_loss_dip_min_s": 0.4,
+  "ball_loss_pace_change_gaps": 3,
+  "ball_loss_min_baseline_intervals": 4,
+  "ball_loss_history_intervals": 12,
   "head_down_pitch_deg": 17.0,
   "head_up_pitch_deg": 22.0,
   "head_down_min_s": 1.0,
@@ -166,15 +172,15 @@
  ],
  "expected": {
   "events": [
-   {"frame":12,"kind":"contact","t_s":0.19999999999999998,"reported_t_s":0.21666666666666665,"foot":"left","value":null},
-   {"frame":18,"kind":"speed","t_s":0.21666666666666665,"reported_t_s":0.31666666666666665,"foot":"left","value":1.6499999999999997},
-   {"frame":45,"kind":"lost_control","t_s":0.6,"reported_t_s":1.1,"foot":null,"value":null},
-   {"frame":71,"kind":"reset","t_s":2.033333333333333,"reported_t_s":2.033333333333333,"foot":null,"value":null},
-   {"frame":76,"kind":"contact","t_s":2.0999999999999996,"reported_t_s":2.1166666666666663,"foot":"right","value":null},
-   {"frame":83,"kind":"speed","t_s":2.1166666666666663,"reported_t_s":2.2333333333333325,"foot":"right","value":1.6500000000000057},
-   {"frame":100,"kind":"contact","t_s":2.4999999999999982,"reported_t_s":2.516666666666665,"foot":"left","value":null},
-   {"frame":100,"kind":"touch","t_s":2.0999999999999996,"reported_t_s":2.516666666666665,"foot":"right","value":null},
-   {"frame":107,"kind":"speed","t_s":2.516666666666665,"reported_t_s":2.633333333333331,"foot":"left","value":1.6500000000000057}
+   {"frame":12,"kind":"contact","t_s":0.19999999999999998,"reported_t_s":0.21666666666666665,"foot":"left","value":null,"source":null},
+   {"frame":18,"kind":"speed","t_s":0.21666666666666665,"reported_t_s":0.31666666666666665,"foot":"left","value":1.6499999999999997,"source":null},
+   {"frame":45,"kind":"lost_control","t_s":0.6,"reported_t_s":1.1,"foot":null,"value":null,"source":"spatial"},
+   {"frame":71,"kind":"reset","t_s":2.033333333333333,"reported_t_s":2.033333333333333,"foot":null,"value":null,"source":null},
+   {"frame":76,"kind":"contact","t_s":2.0999999999999996,"reported_t_s":2.1166666666666663,"foot":"right","value":null,"source":null},
+   {"frame":83,"kind":"speed","t_s":2.1166666666666663,"reported_t_s":2.2333333333333325,"foot":"right","value":1.6500000000000057,"source":null},
+   {"frame":100,"kind":"contact","t_s":2.4999999999999982,"reported_t_s":2.516666666666665,"foot":"left","value":null,"source":null},
+   {"frame":100,"kind":"touch","t_s":2.0999999999999996,"reported_t_s":2.516666666666665,"foot":"right","value":null,"source":null},
+   {"frame":107,"kind":"speed","t_s":2.516666666666665,"reported_t_s":2.633333333333331,"foot":"left","value":1.6500000000000057,"source":null}
   ],
   "final_touch_rate": {
    "last_minute": 1,

@@ -3,6 +3,7 @@
 import cv2
 import numpy as np
 
+from .metrics import count_lost_control
 from .pose import SKELETON, head_box
 from .video_io import iter_frames
 
@@ -10,6 +11,7 @@ RED = (0, 0, 255)
 WHITE = (255, 255, 255)
 GRAY = (180, 180, 180)
 GREEN = (0, 255, 0)
+LOST_BANNER_S = 1.0  # how long the debug video shows a lost-control banner; display only
 
 
 def update_head_down(head_down: bool, events) -> bool:
@@ -20,6 +22,21 @@ def update_head_down(head_down: bool, events) -> bool:
         elif event.kind == "head_up":
             head_down = False
     return head_down
+
+
+def latest_lost_control(previous, events):
+    """The most recently reported lost_control event, given this frame's events."""
+    for event in events:
+        if event.kind == "lost_control":
+            previous = event
+    return previous
+
+
+def lost_banner(event, t_s: float) -> str | None:
+    """Banner text from the moment a loss was reported, for LOST_BANNER_S."""
+    if event is None or not 0.0 <= t_s - event.reported_t_s < LOST_BANNER_S:
+        return None
+    return f"LOST CONTROL ({event.source})"
 
 
 def get_head_down_intervals(records):
@@ -48,6 +65,17 @@ def get_head_down_intervals(records):
         intervals.append((start, records[-1]["t_s"]))
 
     return intervals
+
+
+def _draw_lost(image, lost: dict, last_lost, t_s: float) -> None:
+    """Lost-control counts by source, and a banner just after each report."""
+    cv2.putText(
+        image, f"lost sp:{lost['spatial']} rh:{lost['rhythm']}", (20, 280),
+        cv2.FONT_HERSHEY_SIMPLEX, 1.0, WHITE, 2,
+    )
+    banner = lost_banner(last_lost, t_s)
+    if banner:
+        cv2.putText(image, banner, (20, 240), cv2.FONT_HERSHEY_SIMPLEX, 1.0, RED, 2)
 
 
 def _draw_head(image, landmarks, head_down, cfg, pitch=None):
@@ -145,6 +173,8 @@ class Hud:
                        ("contact", "left"): 0, ("contact", "right"): 0}
         self.last_reported = {"touch": float("-inf"), "contact": float("-inf")}
         self.head_down = False
+        self.lost = {"spatial": 0, "rhythm": 0}
+        self.last_lost = None
 
     def update(self, events, t_s: float) -> None:
         for event in events:
@@ -152,6 +182,9 @@ class Hud:
                 self.counts[(event.kind, event.foot)] += 1
                 self.last_reported[event.kind] = t_s
         self.head_down = update_head_down(self.head_down, events)
+        for source, n in count_lost_control(events).items():
+            self.lost[source] += n
+        self.last_lost = latest_lost_control(self.last_lost, events)
 
 
 def draw(image, record: dict, landmarks, hud: Hud, cfg, t_s: float) -> None:
@@ -170,6 +203,7 @@ def draw(image, record: dict, landmarks, hud: Hud, cfg, t_s: float) -> None:
         cv2.putText(image, "pred", (center[0] + 30, center[1]), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 165, 255), 2)
     _draw_head(image, landmarks, hud.head_down, cfg, record.get("head_pitch_deg"))
     _draw_flashes(image, hud.last_reported, t_s)
+    _draw_lost(image, hud.lost, hud.last_lost, t_s)
     counts = hud.counts
     mode = "SEARCH" if record["searched_full_frame"] else "TRACK"
     cv2.putText(
@@ -204,6 +238,9 @@ def render(clip_path: str, out_path: str, records: list, landmarks, cfg) -> None
         "touch": float("-inf"),
         "contact": float("-inf"),
     }
+
+    lost = {"spatial": 0, "rhythm": 0}
+    last_lost = None
 
     try:
         for frame in iter_frames(clip_path):
@@ -266,6 +303,10 @@ def render(clip_path: str, out_path: str, records: list, landmarks, cfg) -> None
                     counts[(event.kind, event.foot)] += 1
                     last_reported[event.kind] = frame.t_s
 
+            for source, n in count_lost_control(record["events"]).items():
+                lost[source] += n
+            last_lost = latest_lost_control(last_lost, record["events"])
+
             # Reconstruct head-down state from actual event timestamps.
             head_down = any(
                 start <= frame.t_s <= end
@@ -281,6 +322,7 @@ def render(clip_path: str, out_path: str, records: list, landmarks, cfg) -> None
             )
 
             _draw_flashes(image, last_reported, frame.t_s)
+            _draw_lost(image, lost, last_lost, frame.t_s)
 
             mode = (
                 "SEARCH"
