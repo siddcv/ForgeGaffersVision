@@ -130,12 +130,12 @@ Every later session: open a terminal, then
     Use this time to place the phone and the player.
 
 [ ] START is grey ("STEP INTO FRAME") until the whole player, head to toe, and the ball are
-    in frame, away from the edges, for half a second. The orange text above the button says
+    in frame for 0.2 seconds. The orange text above the button says
     what is missing (head, left foot, right foot, ball). Move the phone back or the player
     in until START turns green.
 
 [ ] During the countdown and the drill, "RECENTER YOURSELF" appears if the player's head or a
-    foot has been out of frame for half a second. Nothing pauses; step back into the middle and
+    foot has been out of frame for 0.2 seconds. Nothing pauses; step back into the middle and
     it goes away. (The ball rolling away is not a framing problem: it counts as lost control.)
 
 [ ] Each drill:
