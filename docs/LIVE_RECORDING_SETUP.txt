@@ -129,6 +129,15 @@ Every later session: open a terminal, then
 [ ] The window opens in READY: the overlay runs but nothing is counted or recorded yet.
     Use this time to place the phone and the player.
 
+[ ] START is grey ("STEP INTO FRAME") until the whole player, head to toe, and the ball are
+    in frame, away from the edges, for half a second. The orange text above the button says
+    what is missing (head, left foot, right foot, ball). Move the phone back or the player
+    in until START turns green.
+
+[ ] During the countdown and the drill, "RECENTER YOURSELF" appears if the player's head or a
+    foot has been out of frame for half a second. Nothing pauses; step back into the middle and
+    it goes away. (The ball rolling away is not a framing problem: it counts as lost control.)
+
 [ ] Each drill:
         START button (or space)   3-second countdown, then counts reset and recording starts
                                   (red REC and the drill time show top-right)
@@ -213,6 +222,11 @@ No recording saved after STOP
     message to Siddharth and use --no-record meanwhile. Recordings are in data/clips/live/, which
     git ignores, so they do not show up in git status (VS Code shows the folder greyed out).
     Only drills between START and STOP are recorded; nothing is saved while the window says READY.
+
+START stays grey even though the player and ball look in frame
+    Read the orange text above the button. "ball not found": the detector cannot see the ball
+    (move it between the feet, better light). "head not in frame": leave some space above the
+    head. If it still will not enable, run with --no-framing-check and tell Siddharth.
 
 Image is sideways or mirrored
     --rotate 90 / 180 / 270, and --flip. Recheck left/right with the left-foot-only test.
