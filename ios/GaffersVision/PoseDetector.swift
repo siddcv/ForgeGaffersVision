@@ -21,7 +21,7 @@ final class PoseDetector {
     }
 
     /// pixelBuffer: the upright, unmirrored BGRA frame. Never throws for "no person".
-    func detect(_ pixelBuffer: CVPixelBuffer, tS: Double) -> [Landmark] {
+    func detect(_ pixelBuffer: CVPixelBuffer, tS: Double) -> [GaffersVisionCore.Landmark] {
         let width = Double(CVPixelBufferGetWidth(pixelBuffer))
         let height = Double(CVPixelBufferGetHeight(pixelBuffer))
         // MediaPipe needs strictly increasing times: add 1 ms on a tie (docs/PREPROCESSING.md).
@@ -34,7 +34,7 @@ final class PoseDetector {
             return Array(repeating: .missing, count: 33)
         }
         return person.map { point in
-            Landmark(x: Double(point.x) * width, y: Double(point.y) * height,
+            GaffersVisionCore.Landmark(x: Double(point.x) * width, y: Double(point.y) * height,
                      visibility: point.visibility?.doubleValue ?? 0)
         }
     }

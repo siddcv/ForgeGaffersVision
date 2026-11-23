@@ -35,7 +35,7 @@ final class HeadPitchSampler {
     }
 
     /// Pitch for this frame (held between samples). tS: the camera's time for this frame.
-    func update(_ frame: CVPixelBuffer, landmarks: [Landmark], tS: Double) -> Double? {
+    func update(_ frame: CVPixelBuffer, landmarks: [GaffersVisionCore.Landmark], tS: Double) -> Double? {
         if tS + 1e-9 < nextSampleS { return latest }
         latest = nil
         let width = CVPixelBufferGetWidth(frame), height = CVPixelBufferGetHeight(frame)
