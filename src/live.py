@@ -19,6 +19,7 @@ with times from the drill's first frame, so it can be labelled (src.label_clip),
 (src.run_clip) and scored (src.evaluate) like any clip. The window's view (overlay, counts, REC)
 is also saved, as output/live/drill_<date>_<time>_overlay.mp4, playing at real speed; it is not a clip
 to label or replay. A clip source starts one drill at once.
+Completed drills also produce a player report on screen and beside the JSON as a text file.
 
 Usage:
     python -m src.live                       # camera 0 (phone-as-webcam apps show up as a camera)
@@ -38,11 +39,12 @@ from datetime import datetime
 from pathlib import Path
 
 import cv2
+import numpy as np
 
 from . import ball as ball_module
 from .config import Config
 from .onnx_detector import OnnxBallDetector, export_onnx
-from .overlay import Hud, draw
+from .overlay import Hud, draw, update_head_down
 from .face_pose import open_head_pitch_sampler
 from .pipeline import POSE_PITCH, FramePipeline
 from .pose import FACE, LEFT_FOOT, RIGHT_FOOT, PoseEstimator
@@ -512,7 +514,21 @@ class Drill:
         self.full_frame_runs = 0
         self.recenter_warnings = 0  # times the head or feet went out of frame mid-drill
         self.last_t = 0.0
+        self.last_head_pitch = None
+        self.head_tracked_s = 0.0
+        self.looking_down_s = 0.0
+        self.head_down_pitch_deg = cfg.head_down_pitch_deg
         self.started = datetime.now()
+
+    def observe_head_pitch(self, t_s: float, pitch: float | None) -> None:
+        # Each known sample represents the interval until the next processed frame.
+        if self.last_head_pitch is not None:
+            elapsed = t_s - self.last_t
+            self.head_tracked_s += elapsed
+            if self.last_head_pitch < self.head_down_pitch_deg:
+                self.looking_down_s += elapsed
+        self.last_head_pitch = pitch
+        self.last_t = t_s
 
 
 def append_manifest_row(manifest: Path, recording: Path, summary: dict, when: datetime) -> None:
@@ -541,9 +557,100 @@ def append_manifest_row(manifest: Path, recording: Path, summary: dict, when: da
         csv.DictWriter(file, fieldnames=columns).writerow({c: known.get(c, "") for c in columns})
 
 
-def save_drill(drill: Drill, recording: Path | None, source: "FrameSource", args, is_camera: bool) -> None:
+def ball_out_of_control_seconds(events: list[dict], end_s: float) -> float:
+    total = 0.0
+    lost_since = None
+    for event in events:
+        if event["kind"] == "lost_control" and event.get("source") == "spatial":
+            lost_since = event["t_s"]
+        elif event["kind"] == "reset" and lost_since is not None:
+            total += event["t_s"] - lost_since
+            lost_since = None
+    if lost_since is not None:
+        total += end_s - lost_since
+    return total
+
+
+def player_report(summary: dict) -> list[str]:
+    looking_down = summary["looking_down_pct"]
+    lost_seconds = summary["ball_out_of_control_s"]
+    pace = summary["average_pace_tpm"]
+    down_text = f"{looking_down:.1f}% of tracked head time" if looking_down is not None else "Unavailable"
+    lost_text = f"{lost_seconds:.1f} seconds" if lost_seconds is not None else "Unavailable"
+    pace_text = f"{pace:.1f} tick-tocks per minute" if pace is not None else "Unavailable"
+    tick_tocks = summary["tick_tocks"]
+    return [
+        "Drill report",
+        f"Head-down time  {down_text}",
+        f"Ball control lost for  {lost_text}",
+        f"Average pace  {pace_text}",
+        f"Tick-tocks performed  {tick_tocks}" if tick_tocks is not None else "Tick-tocks performed  Unavailable",
+    ]
+
+
+def show_player_report(lines: list[str], button: DrillButton, label: str) -> bool:
+    """Show results until dismissed. Return False if the player quits."""
+    view = np.full((492, 900, 3), (35, 24, 19), dtype=np.uint8)
+    primary, secondary = (250, 246, 239), (193, 180, 167)
+    mint, ink = (173, 236, 165), (44, 52, 22)
+
+    def write(text: str, x: int, y: int, scale: float, color: tuple, weight: int = 1) -> None:
+        cv2.putText(view, text, (x, y), cv2.FONT_HERSHEY_SIMPLEX, scale, color, weight, cv2.LINE_AA)
+
+    def panel(x: int, y: int, width: int, height: int, color: tuple, radius: int) -> None:
+        x2, y2 = x + width, y + height
+        cv2.rectangle(view, (x + radius, y), (x2 - radius, y2), color, -1)
+        cv2.rectangle(view, (x, y + radius), (x2, y2 - radius), color, -1)
+        for cx in (x + radius, x2 - radius):
+            for cy in (y + radius, y2 - radius):
+                cv2.circle(view, (cx, cy), radius, color, -1, cv2.LINE_AA)
+
+    write(lines[0], 36, 64, 1.35, primary, 2)
+    headline, total = lines[-1].split("  ", 1)
+    panel(36, 93, 828, 128, mint, 18)
+    write(headline, 64, 165, 0.92, ink, 2)
+    total_scale = 1.5 if total == "Unavailable" else 2.65
+    (total_width, total_height), _ = cv2.getTextSize(total, cv2.FONT_HERSHEY_SIMPLEX, total_scale, 3)
+    write(total, 831 - total_width, 156 + total_height // 2, total_scale, ink, 3)
+
+    for index, (line, color) in enumerate(zip(lines[1:-1], [(224, 197, 174), (170, 203, 255), mint])):
+        x, y = 36 + index * 282, 239
+        panel(x, y, 264, 145, (55, 42, 35), 14)
+        metric, reading = line.split("  ", 1)
+        value, _, units = reading.partition(" ")
+        write(metric, x + 20, y + 37, 0.58, primary)
+        write(value, x + 20, y + 93, 0.88 if value == "Unavailable" else 1.62, color, 2)
+        if units:
+            write(units, x + 20, y + 122, 0.55, secondary)
+
+    button.rect = (664, 405, 864, 459)
+    panel(664, 405, 200, 54, mint, 15)
+    (label_width, _), _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.64, 2)
+    write(label, 749 - label_width // 2, 439, 0.64, ink, 2)
+    cv2.arrowedLine(view, (816, 432), (839, 432), ink, 2, cv2.LINE_AA, tipLength=0.32)
+    cv2.imshow(WINDOW, view)
+    visibility_supported = False
+    while True:
+        key = cv2.waitKey(50) & 0xFF
+        if key in (ord("q"), 27):
+            return False
+        if key in (ord(" "), 13) or button.clicked:
+            button.clicked = False
+            return True
+        # HighGUI can report -1 when the property is unsupported or the window is gone.
+        try:
+            visible = cv2.getWindowProperty(WINDOW, cv2.WND_PROP_VISIBLE)
+        except cv2.error:
+            visible = -1
+        if visible == 0 or (visibility_supported and visible < 0):
+            return False
+        visibility_supported = visibility_supported or visible > 0
+
+
+def save_drill(drill: Drill, recording: Path | None, source: "FrameSource", args, is_camera: bool) -> list[str]:
     overlay = drill.overlay.close(drill.last_t) if drill.overlay is not None else None
     counts = {f"{kind}_{foot}": n for (kind, foot), n in drill.hud.counts.items()}
+    tick_tocks = counts["touch_left"] + counts["touch_right"]
     summary = {
         "source": args.source,
         "recording": str(recording) if recording else None,
@@ -560,6 +667,11 @@ def save_drill(drill: Drill, recording: Path | None, source: "FrameSource", args
         "processing_ms": summary_stats(drill.proc_ms),
         "feedback_lag_ms": summary_stats(drill.lag_ms),
         **counts,
+        "tick_tocks": tick_tocks if drill.proc_ms else None,
+        "average_pace_tpm": 60 * tick_tocks / drill.last_t if drill.last_t else None,
+        "looking_down_pct": 100 * drill.looking_down_s / drill.head_tracked_s if drill.head_tracked_s else None,
+        "head_tracked_s": drill.head_tracked_s,
+        "ball_out_of_control_s": ball_out_of_control_seconds(drill.events, drill.last_t) if drill.last_t else None,
         "lost_control": sum(e["kind"] == "lost_control" for e in drill.events),
         "head_down": sum(e["kind"] == "head_down" for e in drill.events),
     }
@@ -569,7 +681,12 @@ def save_drill(drill: Drill, recording: Path | None, source: "FrameSource", args
     out = Path("output") / "live" / f"{drill.name}.json"
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps({"summary": summary, "events": drill.events}, indent=2))
-    print(json.dumps(summary, indent=2))
+    lines = player_report(summary)
+    report_path = out.with_suffix(".txt")
+    report = "\n".join(lines) + "\n"
+    report_path.write_text(report, encoding="utf-8")
+    print(report, end="")
+    print(f"Saved player report to {report_path}")
     if recording is not None and recording.exists() and recording.stat().st_size > 0:
         print(f"Saved {out} and the recording {recording.resolve()} with its timestamps")
     elif drill.record_path is not None:
@@ -578,6 +695,7 @@ def save_drill(drill: Drill, recording: Path | None, source: "FrameSource", args
         print(f"Saved {out}")
     if overlay is not None:
         print(f"Saved the overlay video {overlay.resolve()}")
+    return lines
 
 
 def main() -> None:
@@ -639,11 +757,14 @@ def main() -> None:
         source.start_drill(drill.record_path)
         state = "drill"
     last_index, last_ms, processed, recent_proc = -1, -1, 0, []
+    quitting = False
+    loop_finished = False
     try:
         while True:
             try:
                 item = source.next_after(last_index)
             except KeyboardInterrupt:  # Ctrl+C: stop like q, so the drill is finished and saved
+                quitting = True
                 break
             if item is None:
                 break
@@ -693,7 +814,10 @@ def main() -> None:
                 drill.full_frame_runs += record["ran_full_frame"]
                 drill.hud.update(record["events"], t_used)
                 drill.events += [{"frame": index, **asdict(event)} for event in record["events"]]
-                drill.last_t = t_used
+                drill.observe_head_pitch(t_used, record["head_pitch_deg"])
+            else:
+                # Keep head feedback active in preview and countdown without counting drill events.
+                preview_hud.head_down = update_head_down(preview_hud.head_down, record["events"])
 
             if args.no_window:
                 continue
@@ -725,6 +849,7 @@ def main() -> None:
             cv2.imshow(WINDOW, view)
             key = cv2.waitKey(1) & 0xFF
             if key in (ord("q"), 27):
+                quitting = True
                 break
             if key == ord(" ") or button.clicked:
                 button.clicked = False
@@ -736,19 +861,27 @@ def main() -> None:
                 elif state == "countdown":
                     state = "ready"
                 else:
-                    save_drill(drill, source.stop_drill(), source, args, is_camera)
+                    lines = save_drill(drill, source.stop_drill(), source, args, is_camera)
                     state, drill = "ready", None
+                    if not show_player_report(lines, button, "CONTINUE" if is_camera else "DONE") or not is_camera:
+                        break
                     preview, preview_hud = FramePipeline(cfg), Hud()
+                    framing = FramingGate(cfg)
+        loop_finished = True
     finally:
         recording = source.stop_drill() if state == "drill" else None
         source.stop()
         pose.close()
         if face_pose is not None:
             face_pose.close()
-        if not args.no_window:
-            cv2.destroyAllWindows()
-    if state == "drill" and drill is not None:
-        save_drill(drill, recording, source, args, is_camera)
+        try:
+            if loop_finished and state == "drill" and drill is not None:
+                lines = save_drill(drill, recording, source, args, is_camera)
+                if not args.no_window and not quitting:
+                    show_player_report(lines, button, "DONE")
+        finally:
+            if not args.no_window:
+                cv2.destroyAllWindows()
 
 
 if __name__ == "__main__":

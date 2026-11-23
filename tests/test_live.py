@@ -5,6 +5,92 @@ import numpy as np
 from src.live import FrameSource
 
 
+def test_player_report_stays_visible_until_continue_is_clicked(monkeypatch):
+    from src.live import WINDOW, DrillButton, show_player_report
+
+    button = DrillButton()
+    shown = []
+    rendered_text = []
+    monkeypatch.setattr(cv2, "imshow", lambda window, image: shown.append(window))
+    monkeypatch.setattr(cv2, "putText", lambda image, text, *args: rendered_text.append(text))
+    monkeypatch.setattr(cv2, "getWindowProperty", lambda *args: -1)
+
+    waits = 0
+
+    def wait_key(delay):
+        nonlocal waits
+        waits += 1
+        if waits == 2:
+            x, y, _, _ = button.rect
+            button.on_mouse(cv2.EVENT_LBUTTONDOWN, x + 1, y + 1, None, None)
+        return -1 if waits <= 2 else ord("q")
+
+    monkeypatch.setattr(cv2, "waitKey", wait_key)
+    lines = ["Drill report", "Head-down time  20.0%", "Ball control lost for  5.0 seconds",
+             "Average pace  10.0 tick-tocks per minute", "Tick-tocks performed  5"]
+
+    assert show_player_report(lines, button, "CONTINUE")
+    assert shown == [WINDOW]
+    assert rendered_text == [
+        "Drill report", "Tick-tocks performed", "5", "Head-down time", "20.0%",
+        "Ball control lost for", "5.0", "seconds", "Average pace", "10.0", "tick-tocks per minute",
+        "CONTINUE",
+    ]
+    assert waits == 2
+    assert not button.clicked
+
+
+@pytest.mark.parametrize("frames, duration", [(20, 30.0), (1, 0.0), (0, 0.0)])
+def test_save_drill_writes_player_report(tmp_path, monkeypatch, frames, duration):
+    import json
+    from types import SimpleNamespace
+
+    from src.config import Config
+    from src.live import Drill, save_drill
+
+    monkeypatch.chdir(tmp_path)
+    cfg = Config()
+    drill = Drill(cfg, "test_drill", None)
+    drill.proc_ms = [1.0] * frames
+    if duration:
+        drill.hud.counts["touch", "left"] = 3
+        drill.hud.counts["touch", "right"] = 2
+        drill.observe_head_pitch(0.0, cfg.head_down_pitch_deg - 1)
+        drill.observe_head_pitch(5.0, None)
+        drill.observe_head_pitch(10.0, cfg.head_down_pitch_deg)
+        drill.observe_head_pitch(duration, None)
+        drill.events = [
+            {"kind": "lost_control", "source": "rhythm", "t_s": 1.0},
+            {"kind": "lost_control", "source": "spatial", "t_s": 5.0},
+            {"kind": "reset", "t_s": 7.0},
+            {"kind": "lost_control", "source": "spatial", "t_s": 27.0},
+        ]
+    source = SimpleNamespace(frame_size=(1280, 720), last_drill_frames=frames)
+    args = SimpleNamespace(source="0", manifest="")
+
+    lines = save_drill(drill, None, source, args, is_camera=True)
+
+    output = tmp_path / "output" / "live"
+    assert (output / "test_drill.txt").read_text().splitlines() == lines
+    data = json.loads((output / "test_drill.json").read_text())
+    assert data["events"] == drill.events
+    assert data["summary"]["frames_processed"] == frames
+    if duration:
+        assert lines == [
+            "Drill report",
+            "Head-down time  20.0% of tracked head time",
+            "Ball control lost for  5.0 seconds",
+            "Average pace  10.0 tick-tocks per minute",
+            "Tick-tocks performed  5",
+        ]
+        assert data["summary"]["head_tracked_s"] == 25.0
+    else:
+        assert "Head-down time  Unavailable" in lines
+        assert "Ball control lost for  Unavailable" in lines
+        assert "Average pace  Unavailable" in lines
+        assert lines[-1] == f"Tick-tocks performed  {'0' if frames else 'Unavailable'}"
+
+
 def write_clip(path, n_frames, fps=30.0):
     writer = cv2.VideoWriter(str(path), cv2.VideoWriter_fourcc(*"mp4v"), fps, (64, 48))
     for value in range(n_frames):
