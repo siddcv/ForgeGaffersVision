@@ -344,13 +344,13 @@ def _step_head(state: State, obs: Observation, cfg) -> tuple:
         return state, []
 
     if state.head_down_since_s is not None:
-        if pitch > cfg.head_up_pitch_deg:
+        if pitch >= cfg.head_down_pitch_deg:
             duration = obs.t_s - state.head_down_since_s
             event = Event("head_up", obs.t_s, obs.t_s, value=duration)
             return replace(state, head_down_since_s=None, head_low_since_s=None), [event]
         return state, []
 
-    if pitch > cfg.head_down_pitch_deg:
+    if pitch >= cfg.head_down_pitch_deg:
         return replace(state, head_low_since_s=None), []
     since = state.head_low_since_s if state.head_low_since_s is not None else obs.t_s
     state = replace(state, head_low_since_s=since)

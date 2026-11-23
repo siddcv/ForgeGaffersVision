@@ -26,7 +26,7 @@ from tests.synth import (
 OUT = Path("tests/vectors")
 FORMAT_VERSION = 1
 CFG = Config()
-UP, DOWN, BETWEEN = head_levels(CFG)  # pitches placed relative to the head thresholds
+UP, DOWN, BETWEEN = head_levels(CFG)  # pitches placed relative to the single head-pitch cutoff
 
 PIPELINE_CLIP = "IMG_1710"
 PIPELINE_START_FRAME = 60  # 1.0 s in: tick-tocks, full-frame searching, a lost control and reset
@@ -170,8 +170,8 @@ def metrics_scenarios() -> dict:
         "head_down_under_1s": ("head down for 30 frames at 30 fps: not reported", head([DOWN] * 30), CFG),
         "head_down_over_1s": ("head up 1 s then down: head_down stamped at 1.0 s",
                               head([UP] * 30 + [DOWN] * 40), CFG),
-        "head_hysteresis": ("pitch flickering between the two thresholds: one down, one up",
-                            head([DOWN] * 40 + [BETWEEN, DOWN] * 10 + [UP]), CFG),
+        "head_hysteresis": ("single cutoff: pitch at the boundary ends the head-down state",
+                            head([DOWN] * 40 + [BETWEEN]), CFG),
     }
 
 
