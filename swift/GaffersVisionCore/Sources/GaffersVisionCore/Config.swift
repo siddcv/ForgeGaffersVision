@@ -39,8 +39,7 @@ public struct Config: Codable, Equatable, Sendable {
     public var lostControlMinS: Double = 0.5
 
     // Head position (Face Landmarker pitch)
-    public var headDownPitchDeg: Double = 17.0
-    public var headUpPitchDeg: Double = 22.0
+    public var headDownPitchDeg: Double = 12.0  // below: looking down; at or above: up
     public var headDownMinS: Double = 1.0
     public var headPoseSampleIntervalS: Double = 0.10
 

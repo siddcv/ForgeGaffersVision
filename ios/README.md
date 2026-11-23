@@ -15,8 +15,8 @@ on a phone.
 | `GaffersVision/Framing.swift` | START waits for head-to-toe framing; RECENTER YOURSELF | `framing_problems`, `FramingGate` |
 | `GaffersVision/ContentView.swift` | screen: picture, overlay, counts, button, summary | `overlay.draw`, `DrillButton` |
 
-Not in this first version: recording drills to video, saving a summary file. Head-down uses the
-thresholds in `src/config.py` (17 / 22 deg), calibrated on one clip only: note the pitch shown on
+Not in this first version: recording drills to video, saving a summary file. Head-down uses the pitch
+cutoff in `src/config.py` (12 deg), calibrated on one clip only: note the pitch shown on
 screen while looking ahead and while looking at the ball. Image preparation follows `docs/PREPROCESSING.md`.
 
 ## Build it (Mac with Xcode, one time)

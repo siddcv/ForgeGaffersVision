@@ -396,7 +396,7 @@ public enum Metrics {
         guard let pitch = obs.headPitchDeg else { return (state, []) }
 
         if let downSince = state.headDownSinceS {
-            if pitch > cfg.headUpPitchDeg {
+            if pitch >= cfg.headDownPitchDeg {
                 let duration = obs.tS - downSince
                 state.headDownSinceS = nil
                 state.headLowSinceS = nil
@@ -405,7 +405,7 @@ public enum Metrics {
             return (state, [])
         }
 
-        if pitch > cfg.headDownPitchDeg {
+        if pitch >= cfg.headDownPitchDeg {
             state.headLowSinceS = nil
             return (state, [])
         }
