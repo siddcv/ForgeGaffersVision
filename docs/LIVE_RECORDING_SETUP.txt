@@ -129,12 +129,14 @@ Every later session: open a terminal, then
 [ ] The window opens in READY: the overlay runs but nothing is counted or recorded yet.
     Use this time to place the phone and the player.
 
-[ ] START is grey ("STEP INTO FRAME") until the whole player, head to toe, and the ball are
-    in frame, away from the edges, for half a second. The orange text above the button says
-    what is missing (head, left foot, right foot, ball). Move the phone back or the player
-    in until START turns green.
+[ ] START works at any time, so the player can press it and then walk into place. After START
+    the window says "STEP INTO FRAME" until the whole player, head to toe, and the ball are
+    in frame, away from the edges, for half a second; the orange text above the button says
+    what is missing (head, left foot, right foot, ball). Then it counts down 3-2-1; stepping
+    out during the countdown goes back to waiting. A drill stops itself after 30 s
+    (--drill-seconds 45 or 60, or 0 for open-ended); STOP ends it early.
 
-[ ] During the countdown and the drill, "RECENTER YOURSELF" appears if the player's head or a
+[ ] During the drill, "RECENTER YOURSELF" appears if the player's head or a
     foot has been out of frame for half a second. Nothing pauses; step back into the middle and
     it goes away. (The ball rolling away is not a framing problem: it counts as lost control.)
 
@@ -223,10 +225,10 @@ No recording saved after STOP
     git ignores, so they do not show up in git status (VS Code shows the folder greyed out).
     Only drills between START and STOP are recorded; nothing is saved while the window says READY.
 
-START stays grey even though the player and ball look in frame
+Stuck on STEP INTO FRAME even though the player and ball look in frame
     Read the orange text above the button. "ball not found": the detector cannot see the ball
     (move it between the feet, better light). "head not in frame": leave some space above the
-    head. If it still will not enable, run with --no-framing-check and tell Siddharth.
+    head. If it still will not count down, run with --no-framing-check and tell Siddharth.
 
 Image is sideways or mirrored
     --rotate 90 / 180 / 270, and --flip. Recheck left/right with the left-foot-only test.

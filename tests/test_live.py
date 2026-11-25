@@ -255,3 +255,76 @@ def test_recenter_warning_is_about_the_body_and_waits_before_showing():
     assert not recenter.update(0.8, [])
     assert not recenter.update(1.2, [])  # back 0.4 s: still shown
     assert recenter.update(1.4, [])  # back 0.6 s: warning cleared
+
+
+def _flow(**kw):
+    from src.config import Config
+    from src.live import DrillFlow
+    return DrillFlow(Config(framing_hold_s=0.5, framing_grace_s=0.5), countdown_s=3.0, **kw)
+
+
+IN_FRAME, OUT = [], ["no player found"]
+
+
+def test_start_waits_for_the_player_then_counts_down_then_starts():
+    flow = _flow()
+    assert flow.update(0.0, OUT) is None and flow.state == "ready"  # nothing happens before START
+    assert flow.press(1.0) is None and flow.state == "waiting"  # START works out of frame
+    for t in (1.0, 2.0, 5.0):  # walking into place
+        assert flow.update(t, OUT) is None and flow.state == "waiting"
+    assert flow.update(6.0, IN_FRAME) is None and flow.state == "waiting"
+    assert flow.update(6.4, IN_FRAME) is None and flow.state == "waiting"  # in frame 0.4 s
+    assert flow.update(6.5, IN_FRAME) is None and flow.state == "countdown"  # 0.5 s: count down
+    assert flow.seconds_left(7.5) == 2.0
+    assert flow.update(9.4, IN_FRAME) is None and flow.state == "countdown"
+    assert flow.update(9.5, IN_FRAME) == "start" and flow.state == "drill"
+
+
+def test_leaving_the_frame_during_the_countdown_goes_back_to_waiting():
+    flow = _flow()
+    flow.press(0.0)
+    flow.update(0.0, IN_FRAME)
+    flow.update(0.5, IN_FRAME)
+    assert flow.state == "countdown"
+    assert flow.update(1.0, ["ball not found"]) is None and flow.state == "countdown"  # brief miss
+    assert flow.update(1.1, IN_FRAME) is None and flow.state == "countdown"
+    flow.update(2.0, ["left foot not in frame"])
+    assert flow.update(2.5, ["left foot not in frame"]) is None and flow.state == "waiting"
+    assert flow.framing.problems == ["left foot not in frame"]
+    flow.update(3.0, IN_FRAME)
+    flow.update(3.5, IN_FRAME)
+    assert flow.state == "countdown" and flow.seconds_left(3.5) == 3.0  # full countdown again
+    assert flow.update(6.5, IN_FRAME) == "start"
+
+
+def test_cancel_from_waiting_or_countdown_and_stop_finishes():
+    flow = _flow()
+    flow.press(0.0)
+    assert flow.press(1.0) is None and flow.state == "ready"  # CANCEL while waiting
+    flow.press(2.0)
+    flow.update(2.0, IN_FRAME)
+    flow.update(2.5, IN_FRAME)
+    assert flow.press(3.0) is None and flow.state == "ready"  # CANCEL during the countdown
+    flow.press(4.0)
+    assert flow.state == "waiting"  # START again needs the player in frame again
+    flow.update(4.0, IN_FRAME)
+    flow.update(4.5, IN_FRAME)
+    assert flow.update(7.5, IN_FRAME) == "start"
+    assert flow.press(20.0) == "finish" and flow.state == "ready"  # STOP
+
+
+def test_timed_drill_stops_itself_and_open_ended_does_not():
+    timed = _flow(drill_s=60.0)
+    timed.state = "drill"
+    assert timed.update(100.0, OUT, drill_elapsed_s=59.9) is None and timed.state == "drill"
+    assert timed.update(100.1, OUT, drill_elapsed_s=60.0) == "finish" and timed.state == "ready"
+    open_ended = _flow(drill_s=None)
+    open_ended.state = "drill"
+    assert open_ended.update(500.0, OUT, drill_elapsed_s=400.0) is None
+
+
+def test_without_the_framing_check_start_counts_down_at_once():
+    flow = _flow(framing_check=False)
+    assert flow.press(0.0) is None and flow.state == "countdown"
+    assert flow.update(1.0, OUT) is None and flow.state == "countdown"  # out of frame: keeps going
+    assert flow.update(3.0, OUT) == "start"

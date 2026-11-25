@@ -12,7 +12,7 @@ on a phone.
 | `GaffersVision/LiveEngine.swift` | per-frame loop, READY / countdown / drill, counts, summary | `main()` in `src/live.py` |
 | `GaffersVision/HeadPitchSampler.swift` | Face Landmarker on a head crop, 10 Hz, pitch for head-down | `HeadPitchSampler` in `src/face_pose.py` |
 | `GaffersVision/HeadPitchMath.swift` | pitch from the face transform, head box and crop | `pitch_from_transformation_matrix`, `pose.head_box` |
-| `GaffersVision/Framing.swift` | START waits for head-to-toe framing; RECENTER YOURSELF | `framing_problems`, `FramingGate` |
+| `GaffersVision/Framing.swift` | after START, the countdown waits for head-to-toe framing; drill length; RECENTER YOURSELF | `framing_problems`, `FramingGate`, `DrillFlow` |
 | `GaffersVision/ContentView.swift` | screen: picture, overlay, counts, button, summary | `overlay.draw`, `DrillButton` |
 
 Not in this first version: recording drills to video, saving a summary file. Head-down uses the pitch
@@ -63,7 +63,10 @@ With a free Apple ID the app stops opening after 7 days; press Run again to rein
 ## Using it
 - Prop the phone up in portrait, screen facing the player (front camera; the camera button
   switches to the back camera). Low, 2-3 m away, as in `docs/LIVE_RECORDING_SETUP.txt`.
-- START is grey until head, both feet and the ball are in frame. Then START, 3-2-1, drill, STOP.
+- Pick the drill length (30 s by default, 45 s, 60 s or Open), press START, then walk into place. The app says
+  STEP INTO FRAME (and what is missing) until head, both feet and the ball are in frame, then
+  counts down 3-2-1 (stepping out goes back to waiting). A sound marks the drill's start and end
+  (ring switch on). A timed drill stops itself; STOP ends any drill early.
 - Bottom-left shows fps and per-frame time. Write these down: they are the phone numbers for
   `docs/IOS_PORT_PLAN.md` Phase 2.
 - Left/right check: tap with only the left foot; the L count must go up.

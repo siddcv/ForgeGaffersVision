@@ -7,12 +7,14 @@ behind the camera: frames that arrive while one is being processed are skipped (
 recorded). The metric thresholds are in seconds, so skipped frames do not change their meaning.
 Laptop speed says nothing about a phone; use this to feel the feedback and try camera placement.
 
-Drills: the window opens in READY (overlay running, nothing counted). START stays grey, with the
-reason shown above it, until the whole player (head to toe) and the ball have been in frame for
-framing_hold_s (--no-framing-check skips this). START (click the button or press space) counts
-down, then resets the counts and starts the drill; STOP ends it. During the countdown and the
-drill, RECENTER YOURSELF shows while the player's head or feet are out of frame (nothing pauses;
-the ball leaving the frame is lost control, not a framing problem). Each drill
+Drills (DrillFlow): the window opens in READY (overlay running, nothing counted). START (click the
+button or press space) works at any time, so a player can press it and then walk into place: the
+app waits, showing what is out of frame, until the whole player (head to toe) and the ball have
+been in frame for framing_hold_s (--no-framing-check skips this), then counts down. Leaving the
+frame during the countdown goes back to waiting. Then the counts reset and the drill runs until
+STOP or, with --drill-seconds (default 30; 0 for open-ended), stops by itself. During the drill,
+RECENTER YOURSELF shows while the player's head or feet are out of frame (nothing pauses; the ball
+leaving the frame is lost control, not a framing problem). Each drill
 from a camera is recorded to data/clips/live/<date>/drill_<date>_<time>.mp4 with a timestamps sidecar
 holding each frame's real capture time, and its summary goes to output/live/drill_<date>_<time>.json,
 with times from the drill's first frame, so it can be labelled (src.label_clip), replayed
@@ -52,6 +54,7 @@ WINDOW = "Gaffer's Vision live"
 DISPLAY_MAX_PX = 900  # longest side of the window
 ROTATIONS = {0: None, 90: cv2.ROTATE_90_CLOCKWISE, 180: cv2.ROTATE_180, 270: cv2.ROTATE_90_COUNTERCLOCKWISE}
 MEASURE_FPS_AFTER_S = 3.0  # report the camera's real frame rate once this much has been read
+DEFAULT_DRILL_S = 30.0  # a drill stops itself after this long (--drill-seconds; the app's default too)
 
 
 def orientation(frame_size) -> str | None:
@@ -138,6 +141,62 @@ class FramingGate:
         else:
             self._since = None
         return self.ready
+
+
+class DrillFlow:
+    """When a drill starts and stops, so a player can press START at the phone and then walk into
+    place: READY -> START -> WAITING until the player (head to toe) and the ball have been fully in
+    frame for framing_hold_s -> COUNTDOWN -> DRILL -> READY. Out of frame for framing_grace_s during
+    the countdown goes back to WAITING (the countdown restarts once back in frame). A drill ends at
+    STOP or, when drill_s is set, by itself after drill_s seconds. CANCEL (START pressed again)
+    leaves WAITING or COUNTDOWN. Times are frame timestamps; the iPhone app ports this class.
+
+    press() and update() return "start" when the drill begins (the caller starts counting from
+    that frame) and "finish" when it ends (the caller saves it); otherwise None."""
+
+    def __init__(self, cfg, countdown_s: float = 3.0, drill_s: float | None = None, framing_check: bool = True):
+        self.cfg, self.countdown_s, self.drill_s, self.framing_check = cfg, countdown_s, drill_s, framing_check
+        self.state = "ready"  # ready, waiting, countdown, drill
+        self.countdown_end = None  # frame time when the countdown ends
+        self.framing = FramingGate(cfg)  # player and ball in frame (waiting and countdown)
+
+    def press(self, t_s: float) -> str | None:
+        """START / CANCEL / STOP, by state."""
+        if self.state == "ready":
+            self.framing = FramingGate(self.cfg)
+            if self.framing_check:
+                self.state = "waiting"
+            else:
+                self.state, self.countdown_end = "countdown", t_s + self.countdown_s
+        elif self.state in ("waiting", "countdown"):
+            self.state, self.countdown_end = "ready", None
+        else:
+            self.state = "ready"
+            return "finish"
+        return None
+
+    def update(self, t_s: float, problems: list[str], drill_elapsed_s: float | None = None) -> str | None:
+        """Once per frame, with this frame's framing problems and, during a drill, its elapsed time."""
+        if self.state == "drill":
+            if self.drill_s and drill_elapsed_s is not None and drill_elapsed_s >= self.drill_s:
+                self.state = "ready"
+                return "finish"
+            return None
+        if self.state == "ready":
+            return None
+        in_frame = self.framing.update(t_s, problems) or not self.framing_check
+        if self.state == "waiting" and in_frame:
+            self.state, self.countdown_end = "countdown", t_s + self.countdown_s
+        elif self.state == "countdown" and not in_frame:
+            self.state, self.countdown_end = "waiting", None
+        elif self.state == "countdown" and t_s >= self.countdown_end:
+            self.state, self.countdown_end = "drill", None
+            return "start"
+        return None
+
+    def seconds_left(self, t_s: float) -> float:
+        """Countdown seconds left."""
+        return max(0.0, self.countdown_end - t_s) if self.countdown_end is not None else 0.0
 
 
 # Tried in order: the first the local OpenCV build can open is used. mp4v is the usual choice;
@@ -590,7 +649,11 @@ def main() -> None:
     # 2 measured best on a 12-core laptop: with every core, the detector starved pose and decoding
     # (proc 123 ms vs 71 ms median on 134129).
     parser.add_argument("--threads", type=int, default=2, help="detector CPU threads (0: ONNX Runtime decides)")
-    parser.add_argument("--countdown", type=float, default=3.0, help="seconds between START and the drill")
+    parser.add_argument("--countdown", type=float, default=3.0,
+                        help="seconds between the player being in frame and the drill")
+    parser.add_argument("--drill-seconds", type=float,
+                        help=f"a drill stops itself after this long; 0 for open-ended (STOP ends it). "
+                             f"Default {DEFAULT_DRILL_S:.0f} with the button, open-ended with --autostart")
     parser.add_argument("--autostart", action="store_true",
                         help="start a drill at once, without the button (always on for clips and --no-window)")
     parser.add_argument("--no-record", action="store_true", help="count drills without saving video")
@@ -599,7 +662,7 @@ def main() -> None:
     parser.add_argument("--no-overlay-video", action="store_true",
                         help="do not save the window's view (output/live/drill_<date>_<time>_overlay.mp4)")
     parser.add_argument("--no-framing-check", action="store_true",
-                        help="enable START without waiting for the player and ball to be fully in frame")
+                        help="count down at START without waiting for the player and ball to be fully in frame")
     parser.add_argument("--no-window", action="store_true", help="no display, e.g. for a timing run")
     parser.add_argument("--max-seconds", type=float, help="stop after this long")
     args = parser.parse_args()
@@ -626,18 +689,26 @@ def main() -> None:
     preview = FramePipeline(cfg)  # keeps the overlay (feet, ball) running between drills; never counts
     preview_hud = Hud()
     button = DrillButton()
-    framing = FramingGate(cfg)  # READY: enables START
-    recenter = FramingGate(cfg, ready=True)  # countdown and drill: RECENTER YOURSELF while not ready
+    drill_s = args.drill_seconds if args.drill_seconds is not None else (None if autostart else DEFAULT_DRILL_S)
+    flow = DrillFlow(cfg, args.countdown, drill_s or None, framing_check=not args.no_framing_check)
+    recenter = FramingGate(cfg, ready=True)  # drill: RECENTER YOURSELF while not ready
     if not args.no_window:
         cv2.namedWindow(WINDOW)
         cv2.setMouseCallback(WINDOW, button.on_mouse)
-        print("Press START (or space) to begin a drill, STOP (or space) to end it, q to quit.")
+        length = f"{drill_s:.0f} s drills" if drill_s else "open-ended drills"
+        print(f"Press START (or space), then step into frame; {length}, STOP (or space) ends one early; q quits.")
 
-    state, drill, countdown_end = "ready", None, None
+    drill = None
     if autostart:
         drill = new_drill()
         source.start_drill(drill.record_path)
-        state = "drill"
+        flow.state = "drill"
+
+    def finish_drill() -> None:
+        nonlocal drill, preview, preview_hud
+        save_drill(drill, source.stop_drill(), source, args, is_camera)
+        drill = None
+        preview, preview_hud = FramePipeline(cfg), Hud()
     last_index, last_ms, processed, recent_proc = -1, -1, 0, []
     try:
         while True:
@@ -651,10 +722,6 @@ def main() -> None:
             last_index = index
             if args.max_seconds and t_s > args.max_seconds:
                 break
-            if state == "countdown" and time.perf_counter() >= countdown_end:
-                drill = new_drill()
-                source.start_drill(drill.record_path)
-                state = "drill"
 
             start = time.perf_counter()
             height, width = bgr.shape[:2]
@@ -662,7 +729,7 @@ def main() -> None:
             last_ms = t_ms
             # Frames from the drill's first frame on go to the drill, timed from that frame.
             drill_t0 = source.drill_t0
-            counting = state == "drill" and drill_t0 is not None and t_s >= drill_t0
+            counting = flow.state == "drill" and drill_t0 is not None and t_s >= drill_t0
             pipeline = drill.pipeline if counting else preview
             t_used = t_s - drill_t0 if counting else t_s
             landmarks = pose.detect(cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB), t_ms)
@@ -675,14 +742,16 @@ def main() -> None:
             record = pipeline.step(t_used, landmarks, crop, crop_candidates,
                                    lambda: detector.detect(bgr, cfg.full_imgsz), head_pitch)
             problems = framing_problems(landmarks, record["ball"], width, height, cfg)
-            if state == "ready":
-                framing.update(t_s, problems)
-            else:  # countdown or drill: warn about the body only; a lost ball is lost control
+            if counting:  # warn about the body only; a lost ball is lost control
                 was_in_frame = recenter.ready
                 recenter.update(t_s, body_problems(problems))
-                if counting and was_in_frame and not recenter.ready:
+                if was_in_frame and not recenter.ready:
                     drill.recenter_warnings += 1
-            start_enabled = args.no_framing_check or framing.ready
+            action = flow.update(t_s, problems, t_used if counting else None)
+            if action == "start":  # counting starts with the next frame
+                drill = new_drill()
+                source.start_drill(drill.record_path)
+                recenter = FramingGate(cfg, ready=True)
             proc = (time.perf_counter() - start) * 1000
             lag = (time.perf_counter() - arrival) * 1000
             processed += 1
@@ -696,24 +765,24 @@ def main() -> None:
                 drill.last_t = t_used
 
             if args.no_window:
+                if action == "finish":
+                    finish_drill()
                 continue
             view = bgr.copy()
             draw(view, record, landmarks, drill.hud if counting else preview_hud, cfg, t_used)
             draw_status(view, statistics.median(recent_proc), lag, processed, source.grabbed)
             view = fit(view, DISPLAY_MAX_PX)
-            if state == "ready" and start_enabled:
+            if flow.state == "ready" and action != "finish":
                 draw_banner(view, "READY", (255, 255, 255))
                 button.draw(view, "START", (0, 150, 0))
-            elif state == "ready":
+            elif flow.state == "waiting":
                 draw_banner(view, "STEP INTO FRAME", (0, 200, 255))
-                draw_framing_hint(view, framing.problems)
-                button.draw(view, "START", (110, 110, 110))
-            elif state == "countdown":
-                draw_countdown(view, countdown_end - time.perf_counter())
+                draw_framing_hint(view, flow.framing.problems)
                 button.draw(view, "CANCEL", (0, 140, 255))
-                if not recenter.ready:
-                    draw_recenter(view, recenter.problems)
-            else:
+            elif flow.state == "countdown":
+                draw_countdown(view, flow.seconds_left(t_s))
+                button.draw(view, "CANCEL", (0, 140, 255))
+            else:  # the drill, including its last frame when it stops by itself
                 recording = source.recording_path is not None
                 draw_banner(view, f"{'REC' if recording else 'DRILL'} {minutes(drill.last_t)}",
                             (0, 0, 255) if recording else (255, 255, 255))
@@ -723,31 +792,25 @@ def main() -> None:
                 if counting and drill.overlay is not None:
                     drill.overlay.add(view, t_used)
             cv2.imshow(WINDOW, view)
+            if action == "finish":  # the drill's time is up
+                print(f"Drill finished after {minutes(drill.last_t)}.")
+                finish_drill()
             key = cv2.waitKey(1) & 0xFF
             if key in (ord("q"), 27):
                 break
             if key == ord(" ") or button.clicked:
                 button.clicked = False
-                if state == "ready" and not start_enabled:
-                    pass  # START is disabled until the player and ball are fully in frame
-                elif state == "ready":
-                    state, countdown_end = "countdown", time.perf_counter() + args.countdown
-                    recenter = FramingGate(cfg, ready=True)
-                elif state == "countdown":
-                    state = "ready"
-                else:
-                    save_drill(drill, source.stop_drill(), source, args, is_camera)
-                    state, drill = "ready", None
-                    preview, preview_hud = FramePipeline(cfg), Hud()
+                if flow.press(t_s) == "finish":
+                    finish_drill()
     finally:
-        recording = source.stop_drill() if state == "drill" else None
+        recording = source.stop_drill() if flow.state == "drill" else None
         source.stop()
         pose.close()
         if face_pose is not None:
             face_pose.close()
         if not args.no_window:
             cv2.destroyAllWindows()
-    if state == "drill" and drill is not None:
+    if flow.state == "drill" and drill is not None:
         save_drill(drill, recording, source, args, is_camera)
 
 

@@ -25,8 +25,19 @@ struct ContentView: View {
                         .shadow(radius: 6)
                 }
                 Spacer()
-                if engine.snapshot.phase == .ready && !engine.snapshot.startEnabled {
-                    warning("Fit head to toe and the ball in frame", engine.snapshot.framingProblems)
+                if engine.snapshot.phase == .waiting {
+                    warning("Step into frame: head to toe and the ball", engine.snapshot.framingProblems)
+                }
+                if engine.snapshot.phase == .ready {
+                    Picker("Drill length", selection: $engine.drillLength) {
+                        ForEach(DrillLength.allCases) { Text($0.rawValue).tag($0) }
+                    }
+                    .pickerStyle(.segmented)
+                    .frame(maxWidth: 320)
+                    .padding(6)
+                    .background(.black.opacity(0.45))
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                    .padding(.bottom, 8)
                 }
                 bottomBar
             }
@@ -71,8 +82,11 @@ struct ContentView: View {
                 Spacer()
                 phaseLabel
             }
-            Text("contacts  L \(c.contactsLeft)  R \(c.contactsRight)    last minute \(c.lastMinute)"
-                 + (s.pacePerMin.map { String(format: "    pace %.0f/min", $0) } ?? ""))
+            // Pace: the drill's average so far, scaled to a minute (goal 150), shown after 3 s.
+            Text(s.pacePerMin.map { String(format: "pace %.0f / min", $0) } ?? "pace --")
+                .font(.title3.bold().monospacedDigit())
+                .foregroundStyle(pace(s.pacePerMin))
+            Text("contacts  L \(c.contactsLeft)  R \(c.contactsRight)")
                 .font(.subheadline).foregroundStyle(s.contactFlash ? .yellow : .white.opacity(0.85))
             // Pitch is shown for the head-down calibration readings (looking ahead vs at the ball).
             Text(s.headPitchDeg.map { String(format: "pitch %.0f deg", $0) } ?? "pitch n/a")
@@ -94,14 +108,26 @@ struct ContentView: View {
     @ViewBuilder private var phaseLabel: some View {
         switch engine.snapshot.phase {
         case .ready:
-            Text(engine.snapshot.startEnabled ? "READY" : "STEP INTO FRAME")
-                .foregroundStyle(engine.snapshot.startEnabled ? .white : .orange).bold()
+            Text("READY").foregroundStyle(.white).bold()
+        case .waiting:
+            Text("STEP INTO FRAME").foregroundStyle(.orange).bold()
         case .countdown:
             Text("GET SET").foregroundStyle(.orange).bold()
-        case .drill(let elapsed):
-            Label(String(format: "%d:%02d", Int(elapsed) / 60, Int(elapsed) % 60), systemImage: "circle.fill")
+        case .drill(let elapsed, let limit):
+            // A timed drill counts down to its end; an open-ended one counts up.
+            Label(clock(limit.map { max(0, $0 - elapsed).rounded(.up) } ?? elapsed), systemImage: "circle.fill")
                 .foregroundStyle(.red).bold()
         }
+    }
+
+    /// Green at or above the 150-a-minute goal.
+    private func pace(_ perMin: Double?) -> Color {
+        guard let perMin else { return .white.opacity(0.85) }
+        return perMin >= Double(DrillSummary.paceGoalPerMin) ? .green : .white
+    }
+
+    private func clock(_ seconds: Double) -> String {
+        String(format: "%d:%02d", Int(seconds) / 60, Int(seconds) % 60)
     }
 
     private var bottomBar: some View {
@@ -127,8 +153,8 @@ struct ContentView: View {
         let s = engine.snapshot
         let (label, color, enabled): (String, Color, Bool) = {
             switch s.phase {
-            case .ready: return ("START", s.startEnabled ? .green : .gray, s.startEnabled)
-            case .countdown: return ("CANCEL", .orange, true)
+            case .ready: return ("START", .green, true)  // works out of frame; the countdown waits
+            case .waiting, .countdown: return ("CANCEL", .orange, true)
             case .drill: return ("STOP", .red, true)
             }
         }()
@@ -206,7 +232,10 @@ struct SummaryView: View {
         VStack(alignment: .leading, spacing: 10) {
             Text("Drill done").font(.largeTitle.bold())
             row("Time", String(format: "%d:%02d", Int(summary.durationS) / 60, Int(summary.durationS) % 60))
-            row("Tick-tocks", "\(summary.tickTocksLeft + summary.tickTocksRight)  (L \(summary.tickTocksLeft), R \(summary.tickTocksRight))")
+            row("Tick-tocks", "\(summary.tickTocks)  (L \(summary.tickTocksLeft), R \(summary.tickTocksRight))")
+            row("Pace", summary.averagePacePerMin().map {
+                String(format: "%.0f / min  (goal %ld)", $0, DrillSummary.paceGoalPerMin)
+            } ?? "--")
             row("Contacts", "L \(summary.contactsLeft), R \(summary.contactsRight)")
             row("Lost control", "\(summary.lostControl)")
             row("Head down", "\(summary.headDown)")

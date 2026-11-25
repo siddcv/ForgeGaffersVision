@@ -127,11 +127,13 @@ window.
 - The front camera, mirrored for display only. A green skeleton, with cyan dots on the left foot
   and pink dots on the right, a yellow foot-crop box, and an orange box on the ball (or an orange
   circle where the tracker predicts it).
-- **STEP INTO FRAME** and a grey START until the head, both feet and the ball are in view; then
-  **READY** and a green START. START gives a 3-2-1 countdown, then the drill timer, then STOP.
+- **READY**, a drill-length picker (30 s, the default / 45 s / 60 s / Open) and a green START that works from anywhere.
+  After START: **STEP INTO FRAME** until the head, both feet and the ball are in view, then a 3-2-1
+  countdown, then the drill timer (counting down for a timed drill), which stops itself or at STOP.
+  (Changed 2026-11-25; before, START stayed grey until the player was in frame.)
 - Top panel: tick-tocks L/R (flash green, about 0.4 s after the touch, because a tick-tock waits
-  for the other foot's answer), contacts L/R (flash yellow at once), last minute, pace, head
-  pitch, **HEAD UP!** and **LOST CONTROL**. **RECENTER YOURSELF** appears if you leave the frame
+  for the other foot's answer), pace (the drill's average so far, per minute, from 3 s in; green
+  at 150 or more), contacts L/R (flash yellow at once), head pitch, **HEAD UP!** and **LOST CONTROL**. **RECENTER YOURSELF** appears if you leave the frame
   mid-drill.
 - Bottom left: fps, ms per frame, and TRACK or SEARCH (searching the full frame for the ball).
 - After STOP: a summary card with counts, processed fps, median ms per frame and full-frame

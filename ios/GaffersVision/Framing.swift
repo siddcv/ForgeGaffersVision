@@ -1,5 +1,5 @@
-// Port of the framing check in src/live.py (framing_problems, FramingGate): START stays disabled
-// until the whole player (head to toe) and the ball are in frame; mid-drill, RECENTER YOURSELF
+// Port of the framing check in src/live.py (framing_problems, FramingGate, DrillFlow): after START,
+// the countdown waits until the whole player (head to toe) and the ball are in frame; mid-drill, RECENTER YOURSELF
 // shows while the head or a foot is out. Values mirror src/config.py (framing_*); change them
 // there first. Not in GaffersVisionCore's Config, because the test vectors' config predates them.
 import GaffersVisionCore
@@ -77,4 +77,71 @@ struct FramingGate {
             since = nil
         }
     }
+}
+
+/// Port of DrillFlow in src/live.py: when a drill starts and stops, so a player can press START at
+/// the phone and then walk into place. READY -> START -> WAITING until the player (head to toe) and
+/// the ball have been fully in frame for holdS -> COUNTDOWN -> DRILL -> READY. Out of frame for
+/// graceS during the countdown goes back to WAITING. A drill ends at STOP or, when drillS is set,
+/// by itself after drillS seconds. START pressed again (CANCEL) leaves WAITING or COUNTDOWN.
+struct DrillFlow {
+    enum State: Equatable { case ready, waiting, countdown, drill }
+    enum Action { case start, finish }
+
+    let countdownS: Double
+    var drillS: Double?  // nil: open-ended
+    private(set) var state = State.ready
+    private(set) var countdownEnd: Double?
+    private(set) var framing = FramingGate()  // player and ball in frame (waiting and countdown)
+
+    init(countdownS: Double = 3.0, drillS: Double? = 60.0) {
+        self.countdownS = countdownS
+        self.drillS = drillS
+    }
+
+    /// START / CANCEL / STOP, by state.
+    mutating func press(_ tS: Double) -> Action? {
+        switch state {
+        case .ready:
+            framing = FramingGate()
+            state = .waiting
+        case .waiting, .countdown:
+            state = .ready
+            countdownEnd = nil
+        case .drill:
+            state = .ready
+            return .finish
+        }
+        return nil
+    }
+
+    /// Once per frame, with this frame's framing problems and, during a drill, its elapsed time.
+    mutating func update(_ tS: Double, _ problems: [String], drillElapsedS: Double? = nil) -> Action? {
+        switch state {
+        case .ready:
+            return nil
+        case .drill:
+            if let drillS, let elapsed = drillElapsedS, elapsed >= drillS {
+                state = .ready
+                return .finish
+            }
+            return nil
+        case .waiting, .countdown:
+            framing.update(tS, problems)
+            if state == .waiting && framing.ready {
+                state = .countdown
+                countdownEnd = tS + countdownS
+            } else if state == .countdown && !framing.ready {
+                state = .waiting
+                countdownEnd = nil
+            } else if state == .countdown, let end = countdownEnd, tS >= end {
+                state = .drill
+                countdownEnd = nil
+                return .start
+            }
+            return nil
+        }
+    }
+
+    func secondsLeft(_ tS: Double) -> Double { countdownEnd.map { max(0, $0 - tS) } ?? 0 }
 }
