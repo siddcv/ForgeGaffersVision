@@ -81,6 +81,7 @@ struct Snapshot {
     var touchFlash = false, contactFlash = false, lostFlash = false
     var headDown = false  // between a head_down and the next head_up event
     var headPitchDeg: Double?
+    var headBox: CGRect?  // pose face points, padded (pose.head_box); red while head down
     var faceLandmarker = false  // false: pose-only pitch estimate (uncalibrated)
     var fps = 0.0, procMs = 0.0
 }
@@ -285,6 +286,9 @@ final class Processor {
             s.frameHeight = Double(CVPixelBufferGetHeight(frame))
         }
         s.landmarks = landmarks
+        if let (x1, y1, x2, y2) = headBox(landmarks, minVisibility: cfg.poseMinVisibility, padding: cfg.headBoxPadding) {
+            s.headBox = CGRect(x: x1, y: y1, width: x2 - x1, height: y2 - y1)
+        }
         s.crop = record?.crop
         s.ball = record?.ball
         s.predictedXY = record?.predicted == true ? record?.ballXY : nil

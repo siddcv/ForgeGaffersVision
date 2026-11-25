@@ -47,7 +47,7 @@ final class HeadPitchSampler {
                let result = try? landmarker.detect(videoFrame: image, timestampInMilliseconds: ms),
                let matrix = result.facialTransformationMatrixes.first {
                 let rows = (0..<4).map { r in (0..<4).map { c in Double(matrix.value(atRow: UInt(r), column: UInt(c))) } }
-                latest = pitchFromTransform(rows)
+                latest = pitchFromTransform(rowMajor(rows))
             }
         }
         nextSampleS = tS + cfg.headPoseSampleIntervalS

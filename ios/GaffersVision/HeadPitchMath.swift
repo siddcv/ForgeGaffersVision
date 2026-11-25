@@ -25,6 +25,22 @@ func pitchFromTransform(_ m: [[Double]]) -> Double? {
     return shifted - 360 * (shifted / 360).rounded(.down) - 180
 }
 
+/// The face transform with the position in the last column and 0 0 0 1 as the bottom row, as
+/// Python's MediaPipe returns it (matrix_c.to_numpy converts its column-major storage). If the iOS
+/// library hands it back the other way round, transpose it: read transposed, the pitch formula
+/// gives the same angle with the opposite sign (looking ahead would read about -30 instead of +30).
+func rowMajor(_ m: [[Double]]) -> [[Double]] {
+    guard m.count == 4, m.allSatisfy({ $0.count == 4 }) else { return m }
+    func isAffineEnd(_ v: [Double]) -> Bool {
+        abs(v[0]) < 1e-3 && abs(v[1]) < 1e-3 && abs(v[2]) < 1e-3 && abs(v[3] - 1) < 1e-3
+    }
+    let bottomRow = m[3], lastColumn = m.map { $0[3] }
+    if !isAffineEnd(bottomRow) && isAffineEnd(lastColumn) {
+        return (0..<4).map { r in (0..<4).map { c in m[c][r] } }
+    }
+    return m
+}
+
 private func determinant(_ a: [[Double]]) -> Double {
     a[0][0] * (a[1][1] * a[2][2] - a[1][2] * a[2][1])
         - a[0][1] * (a[1][0] * a[2][2] - a[1][2] * a[2][0])

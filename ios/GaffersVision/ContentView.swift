@@ -93,8 +93,8 @@ struct ContentView: View {
                 .font(.subheadline.monospaced())
                 .foregroundStyle(s.headDown ? .red : .white.opacity(0.85))
                 + Text(s.faceLandmarker ? "" : "  (pose estimate)").font(.caption).foregroundStyle(.orange)
-            if s.headDown {
-                Text("HEAD UP!").font(.title.bold()).foregroundStyle(.red)
+            if s.headDown {  // as on the laptop overlay
+                Text("HEAD DOWN").font(.title.bold()).foregroundStyle(.red)
             }
             if s.lostFlash {
                 Text("LOST CONTROL").font(.headline.bold()).foregroundStyle(.red)
@@ -205,6 +205,11 @@ struct OverlayView: View {
                 let c = p(s.landmarks[i].x, s.landmarks[i].y)
                 let dot = Path(ellipseIn: CGRect(x: c.x - 4, y: c.y - 4, width: 8, height: 8))
                 context.fill(dot, with: .color(PoseIndex.leftFoot.contains(i) ? .cyan : .pink))
+            }
+            // Head box, as on the laptop overlay: white, red while the head is down.
+            if let box = s.headBox {
+                let r = CGRect(x: box.minX * k, y: box.minY * k, width: box.width * k, height: box.height * k)
+                context.stroke(Path(r), with: .color(s.headDown ? .red : .white), lineWidth: 2)
             }
             if let crop = s.crop {
                 let r = CGRect(origin: p(Double(crop.x1), Double(crop.y1)),
